@@ -11,10 +11,11 @@ using Microsoft.AspNetCore.Mvc;
 namespace KromicFlow.Api.Controllers;
 
 [Route("api/v1/auth")]
-public sealed class AuthController(IMediator mediator) : ApiControllerBase
+public sealed class AuthController(IMediator mediator, IConfiguration configuration) : ApiControllerBase
 {
+    
     [HttpGet("login")]
-    public IActionResult Login([FromServices] IConfiguration configuration)
+    public IActionResult Login()
     {
         var appId = configuration["Meta:AppId"];
         var redirectUri = Uri.EscapeDataString(configuration["Meta:OAuthRedirectUri"] ?? string.Empty);
@@ -32,8 +33,9 @@ public sealed class AuthController(IMediator mediator) : ApiControllerBase
     }
 
     [HttpGet("callback")]
-    public async Task<IActionResult> Callback([FromQuery] string code, [FromQuery] string redirectUri, CancellationToken cancellationToken)
+    public async Task<IActionResult> Callback([FromQuery] string code, CancellationToken cancellationToken)
     {
+        var redirectUri = Uri.EscapeDataString(configuration["Meta:OAuthRedirectUri"] ?? string.Empty);
         var result = await mediator.Send(new MetaCallbackCommand(code, redirectUri, Request.Headers.UserAgent, null, null, HttpContext.Connection.RemoteIpAddress?.ToString()), cancellationToken);
         return FromResult(result);
     }
