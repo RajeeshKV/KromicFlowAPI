@@ -45,7 +45,7 @@ public static class DependencyInjection
         services.AddHttpClient<IMetaApiClient, MetaApiClient>((provider, client) =>
         {
             var meta = configuration.GetSection("Meta").Get<MetaOptions>() ?? new MetaOptions();
-            client.BaseAddress = new Uri(meta.InstagramGraphApiBaseUrl);
+            client.BaseAddress = new Uri(meta.GraphApiBaseUrl);
             client.Timeout = TimeSpan.FromSeconds(30);
         });
         services.AddHttpClient<INotificationSender, BrevoNotificationSender>((provider, client) =>
