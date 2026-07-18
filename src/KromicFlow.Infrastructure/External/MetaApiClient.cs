@@ -38,18 +38,15 @@ public sealed class MetaApiClient(
             
             var longLivedToken = await ExchangeForLongLivedTokenAsync(shortLivedToken, cancellationToken);
             
-            logger.LogInformation("Retrieving user profile from Meta");
+            logger.LogInformation("Retrieving Instagram user profile");
             var userProfile = await GetUserProfileAsync(longLivedToken, cancellationToken);
-            
-            logger.LogInformation("Retrieving Instagram business account");
-            var instagramAccount = await GetInstagramBusinessAccountAsync(longLivedToken, cancellationToken);
 
             return new MetaUserProfile(
-                MetaUserId: userProfile.Id,
-                Email: userProfile.Email ?? $"{userProfile.Id}@facebook.com",
-                FullName: userProfile.Name,
-                InstagramUserId: instagramAccount.IgId,
-                InstagramUsername: instagramAccount.Username,
+                MetaUserId: userProfile.UserId,
+                Email: $"{userProfile.Username}@instagram.com",
+                FullName: userProfile.Username,
+                InstagramUserId: userProfile.UserId,
+                InstagramUsername: userProfile.Username,
                 AccessToken: longLivedToken);
         }
         catch (HttpRequestException ex)
@@ -72,7 +69,7 @@ public sealed class MetaApiClient(
             ["client_secret"] = options.Value.AppSecret,
             ["access_token"] = shortLivedToken
         };
-        var url = QueryHelpers.AddQueryString($"{options.Value.GraphApiBaseUrl}/oauth/access_token", query);
+        var url = QueryHelpers.AddQueryString($"{options.Value.GraphApiBaseUrl}/access_token", query);
 
         var response = await RetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
         response.EnsureSuccessStatusCode();
@@ -97,7 +94,7 @@ public sealed class MetaApiClient(
             ["grant_type"] = "ig_refresh_token",
             ["access_token"] = longLivedToken
         };
-        var url = QueryHelpers.AddQueryString($"{options.Value.GraphApiBaseUrl}/oauth/access_token", query);
+        var url = QueryHelpers.AddQueryString($"{options.Value.GraphApiBaseUrl}/refresh_access_token", query);
 
         var response = await RetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
         
@@ -129,7 +126,7 @@ public sealed class MetaApiClient(
 
     private async Task<string> ExchangeCodeForShortLivedTokenAsync(string code, string redirectUri, CancellationToken cancellationToken)
     {
-        var query = new Dictionary<string, string>
+        var formData = new Dictionary<string, string>
         {
             ["client_id"] = options.Value.AppId,
             ["client_secret"] = options.Value.AppSecret,
@@ -137,9 +134,11 @@ public sealed class MetaApiClient(
             ["redirect_uri"] = redirectUri,
             ["code"] = code
         };
-        var url = QueryHelpers.AddQueryString($"{options.Value.GraphApiBaseUrl}/oauth/access_token", query);
+        
+        var content = new FormUrlEncodedContent(formData);
+        var url = $"{options.Value.ApiBaseUrl}/oauth/access_token";
 
-        var response = await RetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
+        var response = await RetryAsync(() => httpClient.PostAsync(url, content, cancellationToken), cancellationToken);
         
         if (!response.IsSuccessStatusCode)
         {
@@ -149,8 +148,8 @@ public sealed class MetaApiClient(
             throw new MetaApiException($"Meta API error during code exchange: {response.StatusCode}");
         }
 
-        var content = await response.Content.ReadAsStringAsync(cancellationToken);
-        var result = JsonSerializer.Deserialize<MetaTokenResponse>(content, _jsonOptions);
+        var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+        var result = JsonSerializer.Deserialize<MetaTokenResponse>(responseContent, _jsonOptions);
 
         if (result?.AccessToken == null)
         {
@@ -166,7 +165,7 @@ public sealed class MetaApiClient(
     {
         var query = new Dictionary<string, string>
         {
-            ["fields"] = "id,name,email",
+            ["fields"] = "user_id,username",
             ["access_token"] = accessToken
         };
         var url = QueryHelpers.AddQueryString($"{options.Value.GraphApiBaseUrl}/me", query);
@@ -175,8 +174,8 @@ public sealed class MetaApiClient(
         
         if (!response.IsSuccessStatusCode)
         {
-            logger.LogError("Failed to retrieve user profile: {StatusCode}", response.StatusCode);
-            throw new MetaApiException($"Failed to retrieve user profile: {response.StatusCode}");
+            logger.LogError("Failed to retrieve Instagram user profile: {StatusCode}", response.StatusCode);
+            throw new MetaApiException($"Failed to retrieve Instagram user profile: {response.StatusCode}");
         }
 
         var content = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -191,73 +190,8 @@ public sealed class MetaApiClient(
         return result;
     }
 
-    private async Task<MetaInstagramAccount> GetInstagramBusinessAccountAsync(string accessToken, CancellationToken cancellationToken)
-    {
-        var query = new Dictionary<string, string>
-        {
-            ["fields"] = "instagram_business_account",
-            ["access_token"] = accessToken
-        };
-        var url = QueryHelpers.AddQueryString($"{options.Value.GraphApiBaseUrl}/me/accounts", query);
-        
-        var response = await RetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
-        
-        if (!response.IsSuccessStatusCode)
-        {
-            logger.LogError("Failed to retrieve Facebook pages: {StatusCode}", response.StatusCode);
-            throw new MetaApiException($"Failed to retrieve Facebook pages: {response.StatusCode}");
-        }
-
-        var content = await response.Content.ReadAsStringAsync(cancellationToken);
-        var pagesResponse = JsonSerializer.Deserialize<MetaPagesResponse>(content, _jsonOptions);
-
-        if (pagesResponse?.Data == null || pagesResponse.Data.Count == 0)
-        {
-            logger.LogError("No Facebook pages found for user");
-            throw new MetaApiException("No Facebook pages found. User must have a Facebook page with an Instagram business account.");
-        }
-
-        var firstPageWithIg = pagesResponse.Data.FirstOrDefault(p => p.InstagramBusinessAccount != null);
-        if (firstPageWithIg?.InstagramBusinessAccount == null)
-        {
-            logger.LogError("No Instagram business account found on any Facebook page");
-            throw new MetaApiException("No Instagram business account found. User must connect an Instagram business account to a Facebook page.");
-        }
-
-        var igAccountId = firstPageWithIg.InstagramBusinessAccount.Id;
-        var igQuery = new Dictionary<string, string>
-        {
-            ["fields"] = "username,ig_id",
-            ["access_token"] = accessToken
-        };
-        var igUrl = QueryHelpers.AddQueryString($"{options.Value.GraphApiBaseUrl}/{igAccountId}", igQuery);
-        
-        var igResponse = await RetryAsync(() => httpClient.GetAsync(igUrl, cancellationToken), cancellationToken);
-        
-        if (!igResponse.IsSuccessStatusCode)
-        {
-            logger.LogError("Failed to retrieve Instagram account details: {StatusCode}", igResponse.StatusCode);
-            throw new MetaApiException($"Failed to retrieve Instagram account details: {igResponse.StatusCode}");
-        }
-
-        var igContent = await igResponse.Content.ReadAsStringAsync(cancellationToken);
-        var igAccount = JsonSerializer.Deserialize<MetaInstagramAccount>(igContent, _jsonOptions);
-
-        if (igAccount == null)
-        {
-            logger.LogError("Meta API returned invalid Instagram account");
-            throw new MetaApiException("Invalid Instagram account from Meta API");
-        }
-
-        return igAccount;
-    }
-
     private record MetaTokenResponse(string? AccessToken, string? TokenType, long? ExpiresIn);
-    private record MetaUser(string Id, string Name, string? Email);
-    private record MetaInstagramBusinessAccount(string Id);
-    private record MetaPage(string Id, MetaInstagramBusinessAccount? InstagramBusinessAccount);
-    private record MetaPagesResponse(List<MetaPage> Data);
-    private record MetaInstagramAccount(string Id, string Username, string IgId);
+    private record MetaUser(string UserId, string Username);
 
     private async Task<HttpResponseMessage> RetryAsync(Func<Task<HttpResponseMessage>> requestFunc, CancellationToken cancellationToken)
     {

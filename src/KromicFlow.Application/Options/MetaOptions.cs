@@ -23,4 +23,8 @@ public sealed class MetaOptions
     [Required]
     [Url]
     public string GraphApiBaseUrl { get; set; } = "https://graph.instagram.com/v20.0";
+    
+    [Required]
+    [Url]
+    public string ApiBaseUrl { get; set; } = "https://api.instagram.com";
 }
