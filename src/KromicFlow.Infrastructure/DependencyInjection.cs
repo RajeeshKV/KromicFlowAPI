@@ -32,6 +32,8 @@ public static class DependencyInjection
             .ValidateOnStart();
 
         services.AddDbContext<KromicFlowDbContext>(options => options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
+        services.AddMemoryCache();
+        services.AddDataProtection();
         services.AddScoped<IKromicFlowDbContext>(provider => provider.GetRequiredService<KromicFlowDbContext>());
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
