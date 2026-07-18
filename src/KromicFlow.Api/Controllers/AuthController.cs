@@ -18,7 +18,17 @@ public sealed class AuthController(IMediator mediator) : ApiControllerBase
     {
         var appId = configuration["Meta:AppId"];
         var redirectUri = Uri.EscapeDataString(configuration["Meta:OAuthRedirectUri"] ?? string.Empty);
-        return Redirect($"https://www.facebook.com/v20.0/dialog/oauth?client_id={appId}&redirect_uri={redirectUri}&scope=instagram_basic,instagram_manage_comments,pages_show_list,pages_read_engagement&response_type=code");
+        
+        var url =
+        $"https://www.instagram.com/oauth/authorize" +
+        $"?enable_fb_login=0" +
+        $"&force_authentication=1" +
+        $"&client_id={appId}" +
+        $"&redirect_uri={redirectUri}" +
+        $"&response_type=code" +
+        $"&scope=instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments";
+
+    return Redirect(url);
     }
 
     [HttpGet("callback")]
