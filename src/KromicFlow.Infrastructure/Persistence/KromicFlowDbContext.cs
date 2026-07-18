@@ -210,7 +210,7 @@ public sealed class KromicFlowDbContext(DbContextOptions<KromicFlowDbContext> op
 
         modelBuilder.Entity<OutboxEvent>(entity =>
         {
-            entity.HasIndex(x => x.IsProcessed);
+            entity.HasIndex(x => x.ProcessedUtc);
             entity.HasIndex(x => x.CreatedUtc);
             entity.Property(x => x.EventType).HasMaxLength(200);
             entity.Property(x => x.Payload).HasColumnType("jsonb");

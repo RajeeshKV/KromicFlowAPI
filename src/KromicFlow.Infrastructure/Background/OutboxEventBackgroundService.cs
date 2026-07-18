@@ -42,7 +42,7 @@ public sealed class OutboxEventBackgroundService(
     private async Task ProcessOutboxEventsAsync(CancellationToken cancellationToken)
     {
         var unprocessedEvents = await db.OutboxEvents
-            .Where(x => !x.IsProcessed && x.RetryCount < MaxRetryCount)
+            .Where(x => !x.ProcessedUtc.HasValue && x.RetryCount < MaxRetryCount)
             .OrderBy(x => x.CreatedUtc)
             .Take(50)
             .ToListAsync(cancellationToken);
