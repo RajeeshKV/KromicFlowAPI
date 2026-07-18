@@ -22,7 +22,6 @@ public static class WebApplicationExtensions
         app.UseAuthentication();
         app.UseAuthorization();
         app.MapControllers().RequireRateLimiting("api");
-        app.MapGet("/api/health", () => Results.Ok(new { status = "healthy", utc = DateTime.UtcNow }));
         app.MapGet("/", () => Results.Redirect("/api/health"));
         return app;
     }
