@@ -16,11 +16,18 @@ internal sealed class MetaCallbackCommandHandler(
     IRefreshTokenService refreshTokenService,
     IJwtTokenService jwtTokenService,
     IAuditWriter auditWriter,
+    IOAuthStateService oauthStateService,
+    IDataProtectionService dataProtectionService,
     IOptions<PlatformOptions> platformOptions,
     IOptions<JwtOptions> jwtOptions) : IRequestHandler<MetaCallbackCommand, Result<LoginResponseDto>>
 {
     public async Task<Result<LoginResponseDto>> Handle(MetaCallbackCommand request, CancellationToken cancellationToken)
     {
+        if (!oauthStateService.ValidateState(request.State))
+        {
+            return Result<LoginResponseDto>.Failure("Invalid OAuth state. Possible CSRF attack.");
+        }
+
         var profile = await metaApiClient.ExchangeAuthorizationCodeAsync(request.Code, request.RedirectUri, cancellationToken);
         var plan = await db.Plans.FirstOrDefaultAsync(x => x.Code == platformOptions.Value.DefaultPlanCode, cancellationToken)
             ?? await db.Plans.FirstAsync(x => x.IsDefault, cancellationToken);
@@ -37,15 +44,19 @@ internal sealed class MetaCallbackCommandHandler(
         if (!user.IsActive || loginBlocked) return Result<LoginResponseDto>.Failure("User login is restricted.");
 
         var account = await db.InstagramAccounts.FirstOrDefaultAsync(x => x.UserId == user.Id && x.InstagramUserId == profile.InstagramUserId, cancellationToken);
+        var encryptedToken = dataProtectionService.Protect(profile.AccessToken);
+        var tokenExpiry = DateTime.UtcNow.AddDays(60);
+        
         if (account is null)
         {
-            account = new InstagramAccount { User = user, InstagramUserId = profile.InstagramUserId, Username = profile.InstagramUsername, AccessTokenEncrypted = profile.AccessToken };
+            account = new InstagramAccount { User = user, InstagramUserId = profile.InstagramUserId, Username = profile.InstagramUsername, AccessTokenEncrypted = encryptedToken, TokenExpiresUtc = tokenExpiry };
             db.InstagramAccounts.Add(account);
         }
         else
         {
             account.Username = profile.InstagramUsername;
-            account.AccessTokenEncrypted = profile.AccessToken;
+            account.AccessTokenEncrypted = encryptedToken;
+            account.TokenExpiresUtc = tokenExpiry;
             account.RefreshRequired = false;
             account.UpdatedUtc = DateTime.UtcNow;
         }

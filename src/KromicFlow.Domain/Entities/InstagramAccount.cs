@@ -10,5 +10,6 @@ public sealed class InstagramAccount : Entity
     public bool RefreshRequired { get; set; }
     public DateTime ConnectedUtc { get; set; } = DateTime.UtcNow;
     public DateTime? LastSyncUtc { get; set; }
+    public DateTime? TokenExpiresUtc { get; set; }
     public ICollection<Automation> Automations { get; set; } = [];
 }

@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using FluentValidation;
+using KromicFlow.Application.Abstractions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace KromicFlow.Api.Middleware;
@@ -15,6 +16,11 @@ public sealed class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Ex
         catch (ValidationException exception)
         {
             await WriteProblemAsync(context, StatusCodes.Status400BadRequest, "Validation failed", exception.Errors.FirstOrDefault()?.ErrorMessage ?? exception.Message);
+        }
+        catch (MetaApiException exception)
+        {
+            logger.LogError(exception, "Meta API error for {Method} {Path} - {Message}", context.Request.Method, context.Request.Path, exception.Message);
+            await WriteProblemAsync(context, StatusCodes.Status502BadGateway, "Meta API Error", "Failed to communicate with Meta API. Please try again later.");
         }
         catch (Exception exception)
         {

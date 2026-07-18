@@ -7,6 +7,7 @@ internal sealed class MetaCallbackCommandValidator : AbstractValidator<MetaCallb
     public MetaCallbackCommandValidator()
     {
         RuleFor(x => x.Code).NotEmpty();
+        RuleFor(x => x.State).NotEmpty();
         RuleFor(x => x.RedirectUri).NotEmpty();
     }
 }

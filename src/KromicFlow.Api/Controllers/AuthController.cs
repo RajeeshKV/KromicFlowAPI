@@ -1,4 +1,5 @@
 ﻿using KromicFlow.Api.Contracts.Auth;
+using KromicFlow.Application.Abstractions;
 using KromicFlow.Application.Features.Auth.AdminBootstrap;
 using KromicFlow.Application.Features.Auth.AdminLogin;
 using KromicFlow.Application.Features.Auth.Logout;
@@ -11,7 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace KromicFlow.Api.Controllers;
 
 [Route("api/v1/auth")]
-public sealed class AuthController(IMediator mediator, IConfiguration configuration) : ApiControllerBase
+public sealed class AuthController(IMediator mediator, IConfiguration configuration, IOAuthStateService oauthStateService) : ApiControllerBase
 {
     
     [HttpGet("login")]
@@ -19,6 +20,7 @@ public sealed class AuthController(IMediator mediator, IConfiguration configurat
     {
         var appId = configuration["Meta:AppId"];
         var redirectUri = Uri.EscapeDataString(configuration["Meta:OAuthRedirectUri"] ?? string.Empty);
+        var state = oauthStateService.GenerateState();
         
         var url =
         $"https://www.instagram.com/oauth/authorize" +
@@ -27,16 +29,17 @@ public sealed class AuthController(IMediator mediator, IConfiguration configurat
         $"&client_id={appId}" +
         $"&redirect_uri={redirectUri}" +
         $"&response_type=code" +
-        $"&scope=instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments";
+        $"&scope=instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments" +
+        $"&state={state}";
 
     return Redirect(url);
     }
 
     [HttpGet("callback")]
-    public async Task<IActionResult> Callback([FromQuery] string code, CancellationToken cancellationToken)
+    public async Task<IActionResult> Callback([FromQuery] string code, [FromQuery] string state, CancellationToken cancellationToken)
     {
         var redirectUri = Uri.EscapeDataString(configuration["Meta:OAuthRedirectUri"] ?? string.Empty);
-        var result = await mediator.Send(new MetaCallbackCommand(code, redirectUri, Request.Headers.UserAgent, null, null, HttpContext.Connection.RemoteIpAddress?.ToString()), cancellationToken);
+        var result = await mediator.Send(new MetaCallbackCommand(code, state, redirectUri, Request.Headers.UserAgent, null, null, HttpContext.Connection.RemoteIpAddress?.ToString()), cancellationToken);
         return FromResult(result);
     }
 

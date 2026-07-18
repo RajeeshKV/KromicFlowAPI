@@ -1,5 +1,6 @@
 ﻿using KromicFlow.Application.Abstractions;
 using KromicFlow.Application.Options;
+using KromicFlow.Infrastructure.Background;
 using KromicFlow.Infrastructure.External;
 using KromicFlow.Infrastructure.Persistence;
 using KromicFlow.Infrastructure.Services;
@@ -24,6 +25,8 @@ public static class DependencyInjection
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<IAuditWriter, AuditWriter>();
+        services.AddScoped<IOAuthStateService, OAuthStateService>();
+        services.AddScoped<IDataProtectionService, DataProtectionService>();
         services.AddHttpClient<IMetaApiClient, MetaApiClient>((provider, client) =>
         {
             var meta = configuration.GetSection("Meta").Get<MetaOptions>() ?? new MetaOptions();
@@ -34,6 +37,7 @@ public static class DependencyInjection
             var brevo = configuration.GetSection("Brevo").Get<BrevoOptions>() ?? new BrevoOptions();
             client.BaseAddress = new Uri(brevo.BaseUrl);
         });
+        services.AddHostedService<TokenRefreshBackgroundService>();
         return services;
     }
 }
