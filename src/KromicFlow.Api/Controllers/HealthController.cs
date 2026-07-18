@@ -64,8 +64,15 @@ public sealed class HealthController(
 
     private async Task<int> GetPendingOutboxEventsCountAsync(CancellationToken cancellationToken)
     {
-        return await dbContext.OutboxEvents
-            .CountAsync(x => !x.ProcessedUtc.HasValue, cancellationToken);
+        try
+        {
+            return await dbContext.OutboxEvents
+                .CountAsync(x => !x.ProcessedUtc.HasValue, cancellationToken);
+        }
+        catch
+        {
+            return -1;
+        }
     }
 }
 
