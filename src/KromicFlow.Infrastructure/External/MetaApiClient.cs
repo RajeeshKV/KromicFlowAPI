@@ -1,8 +1,10 @@
 ﻿using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using KromicFlow.Application.Abstractions;
 using KromicFlow.Application.Options;
 using KromicFlow.Domain.Entities;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -64,10 +66,13 @@ public sealed class MetaApiClient(
 
     public async Task<string> ExchangeForLongLivedTokenAsync(string shortLivedToken, CancellationToken cancellationToken)
     {
-        var url = $"{options.Value.GraphApiBaseUrl}/oauth/access_token" +
-                  $"?grant_type=ig_exchange_token" +
-                  $"&client_secret={options.Value.AppSecret}" +
-                  $"&access_token={shortLivedToken}";
+        var query = new Dictionary<string, string>
+        {
+            ["grant_type"] = "ig_exchange_token",
+            ["client_secret"] = options.Value.AppSecret,
+            ["access_token"] = shortLivedToken
+        };
+        var url = QueryHelpers.AddQueryString($"{options.Value.GraphApiBaseUrl}/oauth/access_token", query);
 
         var response = await RetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
         response.EnsureSuccessStatusCode();
@@ -87,9 +92,12 @@ public sealed class MetaApiClient(
 
     public async Task<string> RefreshLongLivedTokenAsync(string longLivedToken, CancellationToken cancellationToken)
     {
-        var url = $"{options.Value.GraphApiBaseUrl}/oauth/access_token" +
-                  $"?grant_type=ig_refresh_token" +
-                  $"&access_token={longLivedToken}";
+        var query = new Dictionary<string, string>
+        {
+            ["grant_type"] = "ig_refresh_token",
+            ["access_token"] = longLivedToken
+        };
+        var url = QueryHelpers.AddQueryString($"{options.Value.GraphApiBaseUrl}/oauth/access_token", query);
 
         var response = await RetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
         
@@ -121,19 +129,23 @@ public sealed class MetaApiClient(
 
     private async Task<string> ExchangeCodeForShortLivedTokenAsync(string code, string redirectUri, CancellationToken cancellationToken)
     {
-        var url = $"{options.Value.GraphApiBaseUrl}/oauth/access_token" +
-                  $"?client_id={options.Value.AppId}" +
-                  $"&client_secret={options.Value.AppSecret}" +
-                  $"&grant_type=authorization_code" +
-                  $"&redirect_uri={redirectUri}" +
-                  $"&code={code}";
+        var query = new Dictionary<string, string>
+        {
+            ["client_id"] = options.Value.AppId,
+            ["client_secret"] = options.Value.AppSecret,
+            ["grant_type"] = "authorization_code",
+            ["redirect_uri"] = redirectUri,
+            ["code"] = code
+        };
+        var url = QueryHelpers.AddQueryString($"{options.Value.GraphApiBaseUrl}/oauth/access_token", query);
 
         var response = await RetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
         
         if (!response.IsSuccessStatusCode)
         {
             var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-            logger.LogError("Meta API returned error during code exchange: {StatusCode} - {Content}", response.StatusCode, errorContent);
+            var sanitizedError = SanitizeSensitiveData(errorContent);
+            logger.LogError("Meta API returned error during code exchange: {StatusCode} - {Content}", response.StatusCode, sanitizedError);
             throw new MetaApiException($"Meta API error during code exchange: {response.StatusCode}");
         }
 
@@ -152,7 +164,12 @@ public sealed class MetaApiClient(
 
     private async Task<MetaUser> GetUserProfileAsync(string accessToken, CancellationToken cancellationToken)
     {
-        var url = $"{options.Value.GraphApiBaseUrl}/me?fields=id,name,email&access_token={accessToken}";
+        var query = new Dictionary<string, string>
+        {
+            ["fields"] = "id,name,email",
+            ["access_token"] = accessToken
+        };
+        var url = QueryHelpers.AddQueryString($"{options.Value.GraphApiBaseUrl}/me", query);
         
         var response = await RetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
         
@@ -176,7 +193,12 @@ public sealed class MetaApiClient(
 
     private async Task<MetaInstagramAccount> GetInstagramBusinessAccountAsync(string accessToken, CancellationToken cancellationToken)
     {
-        var url = $"{options.Value.GraphApiBaseUrl}/me/accounts?fields=instagram_business_account&access_token={accessToken}";
+        var query = new Dictionary<string, string>
+        {
+            ["fields"] = "instagram_business_account",
+            ["access_token"] = accessToken
+        };
+        var url = QueryHelpers.AddQueryString($"{options.Value.GraphApiBaseUrl}/me/accounts", query);
         
         var response = await RetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
         
@@ -203,7 +225,12 @@ public sealed class MetaApiClient(
         }
 
         var igAccountId = firstPageWithIg.InstagramBusinessAccount.Id;
-        var igUrl = $"{options.Value.GraphApiBaseUrl}/{igAccountId}?fields=username,ig_id&access_token={accessToken}";
+        var igQuery = new Dictionary<string, string>
+        {
+            ["fields"] = "username,ig_id",
+            ["access_token"] = accessToken
+        };
+        var igUrl = QueryHelpers.AddQueryString($"{options.Value.GraphApiBaseUrl}/{igAccountId}", igQuery);
         
         var igResponse = await RetryAsync(() => httpClient.GetAsync(igUrl, cancellationToken), cancellationToken);
         
@@ -269,5 +296,19 @@ public sealed class MetaApiClient(
             System.Net.HttpStatusCode.Unauthorized or
             System.Net.HttpStatusCode.Forbidden or
             System.Net.HttpStatusCode.NotFound;
+    }
+
+    private static string SanitizeSensitiveData(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+            return input;
+
+        var result = Regex.Replace(input, @"access_token=[^&\s]+", "access_token=[REDACTED]");
+        result = Regex.Replace(result, @"client_secret=[^&\s]+", "client_secret=[REDACTED]");
+        result = Regex.Replace(result, @"code=[^&\s]+", "code=[REDACTED]");
+        result = Regex.Replace(result, @"""access_token""\s*:\s*""[^""]+""", "\"access_token\": \"[REDACTED]\"");
+        result = Regex.Replace(result, @"""client_secret""\s*:\s*""[^""]+""", "\"client_secret\": \"[REDACTED]\"");
+        result = Regex.Replace(result, @"""code""\s*:\s*""[^""]+""", "\"code\": \"[REDACTED]\"");
+        return result;
     }
 }

@@ -19,7 +19,7 @@ public sealed class AuthController(IMediator mediator, IConfiguration configurat
     public IActionResult Login()
     {
         var appId = configuration["Meta:AppId"];
-        var redirectUri = Uri.EscapeDataString(configuration["Meta:OAuthRedirectUri"] ?? string.Empty);
+        var redirectUri = configuration["Meta:OAuthRedirectUri"] ?? string.Empty;
         var state = oauthStateService.GenerateState();
         
         var url =
@@ -27,7 +27,7 @@ public sealed class AuthController(IMediator mediator, IConfiguration configurat
         $"?enable_fb_login=0" +
         $"&force_authentication=1" +
         $"&client_id={appId}" +
-        $"&redirect_uri={redirectUri}" +
+        $"&redirect_uri={Uri.EscapeDataString(redirectUri)}" +
         $"&response_type=code" +
         $"&scope=instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments" +
         $"&state={state}";
@@ -38,7 +38,7 @@ public sealed class AuthController(IMediator mediator, IConfiguration configurat
     [HttpGet("callback")]
     public async Task<IActionResult> Callback([FromQuery] string code, [FromQuery] string state, CancellationToken cancellationToken)
     {
-        var redirectUri = Uri.EscapeDataString(configuration["Meta:OAuthRedirectUri"] ?? string.Empty);
+        var redirectUri = configuration["Meta:OAuthRedirectUri"] ?? string.Empty;
         var result = await mediator.Send(new MetaCallbackCommand(code, state, redirectUri, Request.Headers.UserAgent, null, null, HttpContext.Connection.RemoteIpAddress?.ToString()), cancellationToken);
         return FromResult(result);
     }
