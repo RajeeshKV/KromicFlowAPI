@@ -1,0 +1,57 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{7F291399-32FB-481E-9AD6-B43810282B8C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KromicFlow.Domain", "src\KromicFlow.Domain\KromicFlow.Domain.csproj", "{CD824323-2226-4572-9D1E-D1FF9439C7D8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KromicFlow.Application", "src\KromicFlow.Application\KromicFlow.Application.csproj", "{C0493454-2947-4051-A973-D405B5F93DCD}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KromicFlow.Infrastructure", "src\KromicFlow.Infrastructure\KromicFlow.Infrastructure.csproj", "{0BA617DD-162C-412D-97BE-526DA7267552}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KromicFlow.Api", "src\KromicFlow.Api\KromicFlow.Api.csproj", "{41280A9A-005E-4984-B909-1843D850E66C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{C7BB2168-ACCF-47AD-9ECF-2D0431F4E18A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KromicFlow.Tests", "tests\KromicFlow.Tests\KromicFlow.Tests.csproj", "{5CF2D182-7236-403B-AF62-0F35083A2A48}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CD824323-2226-4572-9D1E-D1FF9439C7D8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CD824323-2226-4572-9D1E-D1FF9439C7D8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CD824323-2226-4572-9D1E-D1FF9439C7D8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CD824323-2226-4572-9D1E-D1FF9439C7D8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C0493454-2947-4051-A973-D405B5F93DCD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C0493454-2947-4051-A973-D405B5F93DCD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C0493454-2947-4051-A973-D405B5F93DCD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C0493454-2947-4051-A973-D405B5F93DCD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0BA617DD-162C-412D-97BE-526DA7267552}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0BA617DD-162C-412D-97BE-526DA7267552}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0BA617DD-162C-412D-97BE-526DA7267552}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0BA617DD-162C-412D-97BE-526DA7267552}.Release|Any CPU.Build.0 = Release|Any CPU
+		{41280A9A-005E-4984-B909-1843D850E66C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{41280A9A-005E-4984-B909-1843D850E66C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{41280A9A-005E-4984-B909-1843D850E66C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{41280A9A-005E-4984-B909-1843D850E66C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5CF2D182-7236-403B-AF62-0F35083A2A48}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5CF2D182-7236-403B-AF62-0F35083A2A48}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5CF2D182-7236-403B-AF62-0F35083A2A48}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5CF2D182-7236-403B-AF62-0F35083A2A48}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{CD824323-2226-4572-9D1E-D1FF9439C7D8} = {7F291399-32FB-481E-9AD6-B43810282B8C}
+		{C0493454-2947-4051-A973-D405B5F93DCD} = {7F291399-32FB-481E-9AD6-B43810282B8C}
+		{0BA617DD-162C-412D-97BE-526DA7267552} = {7F291399-32FB-481E-9AD6-B43810282B8C}
+		{41280A9A-005E-4984-B909-1843D850E66C} = {7F291399-32FB-481E-9AD6-B43810282B8C}
+		{5CF2D182-7236-403B-AF62-0F35083A2A48} = {C7BB2168-ACCF-47AD-9ECF-2D0431F4E18A}
+	EndGlobalSection
+EndGlobal

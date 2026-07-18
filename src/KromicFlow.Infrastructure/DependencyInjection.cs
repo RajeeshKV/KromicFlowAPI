@@ -1,0 +1,39 @@
+﻿using KromicFlow.Application.Abstractions;
+using KromicFlow.Application.Options;
+using KromicFlow.Infrastructure.External;
+using KromicFlow.Infrastructure.Persistence;
+using KromicFlow.Infrastructure.Services;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace KromicFlow.Infrastructure;
+
+public static class DependencyInjection
+{
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<JwtOptions>(configuration.GetSection("Jwt"));
+        services.Configure<MetaOptions>(configuration.GetSection("Meta"));
+        services.Configure<BrevoOptions>(configuration.GetSection("Brevo"));
+        services.Configure<PlatformOptions>(configuration.GetSection("Platform"));
+
+        services.AddDbContext<KromicFlowDbContext>(options => options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
+        services.AddScoped<IKromicFlowDbContext>(provider => provider.GetRequiredService<KromicFlowDbContext>());
+        services.AddScoped<IJwtTokenService, JwtTokenService>();
+        services.AddScoped<IRefreshTokenService, RefreshTokenService>();
+        services.AddScoped<IPasswordHasher, PasswordHasher>();
+        services.AddScoped<IAuditWriter, AuditWriter>();
+        services.AddHttpClient<IMetaApiClient, MetaApiClient>((provider, client) =>
+        {
+            var meta = configuration.GetSection("Meta").Get<MetaOptions>() ?? new MetaOptions();
+            client.BaseAddress = new Uri(meta.GraphApiBaseUrl);
+        });
+        services.AddHttpClient<INotificationSender, BrevoNotificationSender>((provider, client) =>
+        {
+            var brevo = configuration.GetSection("Brevo").Get<BrevoOptions>() ?? new BrevoOptions();
+            client.BaseAddress = new Uri(brevo.BaseUrl);
+        });
+        return services;
+    }
+}

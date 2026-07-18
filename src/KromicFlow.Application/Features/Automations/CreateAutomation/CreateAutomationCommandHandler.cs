@@ -1,0 +1,27 @@
+﻿using KromicFlow.Application.Abstractions;
+using KromicFlow.Application.Common;
+using KromicFlow.Application.DTOs.Automations;
+using KromicFlow.Domain.Entities;
+using MediatR;
+using Microsoft.EntityFrameworkCore;
+
+namespace KromicFlow.Application.Features.Automations.CreateAutomation;
+
+internal sealed class CreateAutomationCommandHandler(IKromicFlowDbContext db, IAuditWriter auditWriter) : IRequestHandler<CreateAutomationCommand, Result<AutomationDto>>
+{
+    public async Task<Result<AutomationDto>> Handle(CreateAutomationCommand request, CancellationToken cancellationToken)
+    {
+        var account = await db.InstagramAccounts.Include(x => x.User).ThenInclude(x => x.Plan).FirstOrDefaultAsync(x => x.Id == request.InstagramAccountId && x.UserId == request.UserId, cancellationToken);
+        if (account is null) return Result<AutomationDto>.Failure("Instagram account not found.");
+        if (await db.UserRestrictions.AnyAsync(x => x.UserId == request.UserId && x.AutomationBlocked, cancellationToken)) return Result<AutomationDto>.Failure("Automations are restricted for this user.");
+        var count = await db.Automations.CountAsync(x => x.InstagramAccount.UserId == request.UserId, cancellationToken);
+        if (count >= account.User.Plan.MaxAutomations) return Result<AutomationDto>.Failure("Plan automation limit reached.");
+
+        var automation = new Automation { InstagramAccountId = request.InstagramAccountId };
+        AutomationMapping.Apply(automation, request.Name, request.TriggerType, request.Keywords, request.PublicReply, request.PrivateReply, request.CooldownSeconds, request.Priority);
+        db.Automations.Add(automation);
+        await db.SaveChangesAsync(cancellationToken);
+        await auditWriter.WriteAsync("AutomationCreated", nameof(Automation), automation.Id.ToString(), request.UserId, null, null, cancellationToken);
+        return Result<AutomationDto>.Success(AutomationMapping.ToDto(automation));
+    }
+}

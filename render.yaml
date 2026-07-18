@@ -1,0 +1,55 @@
+﻿services:
+  - type: web
+    name: kromic-flow-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: dotnet KromicFlow.Api.dll
+    preDeployCommand: chmod +x ./EFMigration.sh && ./EFMigration.sh
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_URLS
+        value: http://+:8080
+      - key: ConnectionStrings__DefaultConnection
+        sync: false
+      - key: Jwt__Key
+        sync: false
+      - key: Jwt__Issuer
+        value: KromicFlow
+      - key: Jwt__Audience
+        value: KromicFlow
+      - key: Jwt__AccessTokenMinutes
+        value: "15"
+      - key: Jwt__RefreshTokenDays
+        value: "30"
+      - key: Meta__AppId
+        sync: false
+      - key: Meta__AppSecret
+        sync: false
+      - key: Meta__OAuthRedirectUri
+        sync: false
+      - key: Meta__WebhookVerifyToken
+        sync: false
+      - key: Meta__WebhookAppSecret
+        sync: false
+      - key: Brevo__BaseUrl
+        value: https://api.brevo.com
+      - key: Brevo__ApiKey
+        sync: false
+      - key: Brevo__SenderEmail
+        sync: false
+      - key: Brevo__SenderName
+        value: Kromic Flow
+      - key: Platform__TermsVersion
+        value: "2026-07-18"
+      - key: Platform__DefaultPlanCode
+        value: free
+      - key: Platform__AdminBootstrapKey
+        sync: false
+      - key: Cors__AllowedOrigins
+        sync: false
+
+
