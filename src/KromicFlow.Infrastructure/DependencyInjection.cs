@@ -42,10 +42,8 @@ public static class DependencyInjection
         services.AddScoped<IOAuthStateService, OAuthStateService>();
         services.AddScoped<IDataProtectionService, DataProtectionService>();
         services.AddScoped<IOutboxEventPublisher, OutboxEventPublisher>();
-        services.AddHttpClient<IMetaApiClient, MetaApiClient>((provider, client) =>
+        services.AddHttpClient<IMetaApiClient, MetaApiClient>(client =>
         {
-            var meta = configuration.GetSection("Meta").Get<MetaOptions>() ?? new MetaOptions();
-            client.BaseAddress = new Uri(meta.GraphApiBaseUrl);
             client.Timeout = TimeSpan.FromSeconds(30);
         });
         services.AddHttpClient<INotificationSender, BrevoNotificationSender>((provider, client) =>
