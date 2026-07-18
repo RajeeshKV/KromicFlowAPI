@@ -7,8 +7,7 @@ using KromicFlow.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-
-namespace KromicFlow.Infrastructure;
+using Polly;
 
 public static class DependencyInjection
 {
@@ -27,10 +26,12 @@ public static class DependencyInjection
         services.AddScoped<IAuditWriter, AuditWriter>();
         services.AddScoped<IOAuthStateService, OAuthStateService>();
         services.AddScoped<IDataProtectionService, DataProtectionService>();
+        services.AddScoped<IOutboxEventPublisher, OutboxEventPublisher>();
         services.AddHttpClient<IMetaApiClient, MetaApiClient>((provider, client) =>
         {
             var meta = configuration.GetSection("Meta").Get<MetaOptions>() ?? new MetaOptions();
             client.BaseAddress = new Uri(meta.GraphApiBaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(30);
         });
         services.AddHttpClient<INotificationSender, BrevoNotificationSender>((provider, client) =>
         {
@@ -38,6 +39,7 @@ public static class DependencyInjection
             client.BaseAddress = new Uri(brevo.BaseUrl);
         });
         services.AddHostedService<TokenRefreshBackgroundService>();
+        services.AddHostedService<OutboxEventBackgroundService>();
         return services;
     }
 }

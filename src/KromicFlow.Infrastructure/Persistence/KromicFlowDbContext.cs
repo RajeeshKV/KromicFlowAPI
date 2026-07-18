@@ -20,6 +20,13 @@ public sealed class KromicFlowDbContext(DbContextOptions<KromicFlowDbContext> op
     public DbSet<RuntimeSetting> RuntimeSettings => Set<RuntimeSetting>();
     public DbSet<TermsAcceptance> TermsAcceptances => Set<TermsAcceptance>();
     public DbSet<NotificationMessage> NotificationMessages => Set<NotificationMessage>();
+    public DbSet<OutboxEvent> OutboxEvents => Set<OutboxEvent>();
+
+    public async Task<IDbTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        var transaction = await Database.BeginTransactionAsync(cancellationToken);
+        return new DbTransaction(transaction);
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -194,6 +201,15 @@ public sealed class KromicFlowDbContext(DbContextOptions<KromicFlowDbContext> op
             entity.Property(x => x.ProviderMessageId).HasMaxLength(200);
             entity.Property(x => x.FailureReason).HasMaxLength(2000);
             entity.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<OutboxEvent>(entity =>
+        {
+            entity.HasIndex(x => x.IsProcessed);
+            entity.HasIndex(x => x.CreatedUtc);
+            entity.Property(x => x.EventType).HasMaxLength(200);
+            entity.Property(x => x.Payload).HasColumnType("jsonb");
+            entity.Property(x => x.Error).HasColumnType("text");
         });
     }
 }
