@@ -22,5 +22,5 @@ public sealed class MetaOptions
     
     [Required]
     [Url]
-    public string GraphApiBaseUrl { get; set; } = "https://graph.facebook.com/v20.0";
+    public string GraphApiBaseUrl { get; set; } = "https://graph.instagram.com/v20.0";
 }
