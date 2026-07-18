@@ -68,8 +68,8 @@ public sealed class OutboxEventBackgroundService(
                 
                 if (@event.RetryCount >= MaxRetryCount)
                 {
-                    @event.ProcessedUtc = DateTime.UtcNow;
-                    @event.Error = $"Max retries reached: {ex.Message}";
+                    await MoveToDeadLetterAsync(@event, cancellationToken);
+                    db.OutboxEvents.Remove(@event);
                 }
             }
         }
@@ -86,5 +86,22 @@ public sealed class OutboxEventBackgroundService(
         @event.ProcessedUtc = DateTime.UtcNow;
         
         return Task.CompletedTask;
+    }
+
+    private async Task MoveToDeadLetterAsync(OutboxEvent @event, CancellationToken cancellationToken)
+    {
+        logger.LogWarning("Moving event {EventId} to dead letter queue after {RetryCount} retries", @event.Id, @event.RetryCount);
+        
+        var deadLetterEvent = new DeadLetterEvent
+        {
+            EventType = @event.EventType,
+            Payload = @event.Payload,
+            Error = @event.Error,
+            FailedUtc = DateTime.UtcNow,
+            RetryCount = @event.RetryCount
+        };
+        
+        db.DeadLetterEvents.Add(deadLetterEvent);
+        await db.SaveChangesAsync(cancellationToken);
     }
 }

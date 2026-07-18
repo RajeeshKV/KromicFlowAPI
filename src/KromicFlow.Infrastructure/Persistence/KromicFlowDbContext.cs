@@ -21,6 +21,7 @@ public sealed class KromicFlowDbContext(DbContextOptions<KromicFlowDbContext> op
     public DbSet<TermsAcceptance> TermsAcceptances => Set<TermsAcceptance>();
     public DbSet<NotificationMessage> NotificationMessages => Set<NotificationMessage>();
     public DbSet<OutboxEvent> OutboxEvents => Set<OutboxEvent>();
+    public DbSet<DeadLetterEvent> DeadLetterEvents => Set<DeadLetterEvent>();
 
     public async Task<IDbTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
     {
@@ -90,6 +91,7 @@ public sealed class KromicFlowDbContext(DbContextOptions<KromicFlowDbContext> op
         modelBuilder.Entity<Session>(entity =>
         {
             entity.HasIndex(x => x.SessionGuid).IsUnique();
+            entity.HasIndex(x => x.RefreshTokenHash).IsUnique();
             entity.HasIndex(x => x.UserId);
             entity.HasIndex(x => x.AdminUserId);
             entity.Property(x => x.RefreshTokenHash).HasMaxLength(256);
@@ -97,6 +99,7 @@ public sealed class KromicFlowDbContext(DbContextOptions<KromicFlowDbContext> op
             entity.Property(x => x.Browser).HasMaxLength(120);
             entity.Property(x => x.OS).HasMaxLength(120);
             entity.Property(x => x.IPAddress).HasMaxLength(80);
+            entity.Property(x => x.Version).IsRowVersion();
             entity.HasOne(x => x.User).WithMany(x => x.Sessions).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.AdminUser).WithMany().HasForeignKey(x => x.AdminUserId).OnDelete(DeleteBehavior.Restrict);
         });
@@ -144,6 +147,7 @@ public sealed class KromicFlowDbContext(DbContextOptions<KromicFlowDbContext> op
             entity.Property(x => x.InstagramUserId).HasMaxLength(100);
             entity.Property(x => x.Username).HasMaxLength(160);
             entity.Property(x => x.AccessTokenEncrypted).HasColumnType("text");
+            entity.Property(x => x.Version).IsRowVersion();
             entity.HasOne(x => x.User).WithMany(x => x.InstagramAccounts).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -156,6 +160,7 @@ public sealed class KromicFlowDbContext(DbContextOptions<KromicFlowDbContext> op
             entity.Property(x => x.KeywordsJson).HasColumnType("jsonb");
             entity.Property(x => x.PublicReply).HasMaxLength(2000);
             entity.Property(x => x.PrivateReply).HasMaxLength(2000);
+            entity.Property(x => x.Version).IsRowVersion();
             entity.HasOne(x => x.InstagramAccount).WithMany(x => x.Automations).HasForeignKey(x => x.InstagramAccountId).OnDelete(DeleteBehavior.Restrict);
         });
     }
@@ -207,6 +212,14 @@ public sealed class KromicFlowDbContext(DbContextOptions<KromicFlowDbContext> op
         {
             entity.HasIndex(x => x.IsProcessed);
             entity.HasIndex(x => x.CreatedUtc);
+            entity.Property(x => x.EventType).HasMaxLength(200);
+            entity.Property(x => x.Payload).HasColumnType("jsonb");
+            entity.Property(x => x.Error).HasColumnType("text");
+        });
+
+        modelBuilder.Entity<DeadLetterEvent>(entity =>
+        {
+            entity.HasIndex(x => x.FailedUtc);
             entity.Property(x => x.EventType).HasMaxLength(200);
             entity.Property(x => x.Payload).HasColumnType("jsonb");
             entity.Property(x => x.Error).HasColumnType("text");

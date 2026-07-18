@@ -7,16 +7,29 @@ using KromicFlow.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Polly;
 
 public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        services.Configure<JwtOptions>(configuration.GetSection("Jwt"));
-        services.Configure<MetaOptions>(configuration.GetSection("Meta"));
-        services.Configure<BrevoOptions>(configuration.GetSection("Brevo"));
-        services.Configure<PlatformOptions>(configuration.GetSection("Platform"));
+        services.AddOptions<JwtOptions>()
+            .Bind(configuration.GetSection("Jwt"))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddOptions<MetaOptions>()
+            .Bind(configuration.GetSection("Meta"))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddOptions<BrevoOptions>()
+            .Bind(configuration.GetSection("Brevo"))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddOptions<PlatformOptions>()
+            .Bind(configuration.GetSection("Platform"))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
 
         services.AddDbContext<KromicFlowDbContext>(options => options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
         services.AddScoped<IKromicFlowDbContext>(provider => provider.GetRequiredService<KromicFlowDbContext>());

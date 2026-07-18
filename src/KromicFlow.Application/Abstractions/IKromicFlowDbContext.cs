@@ -19,6 +19,7 @@ public interface IKromicFlowDbContext
     DbSet<TermsAcceptance> TermsAcceptances { get; }
     DbSet<NotificationMessage> NotificationMessages { get; }
     DbSet<OutboxEvent> OutboxEvents { get; }
+    DbSet<DeadLetterEvent> DeadLetterEvents { get; }
     Task<IDbTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default);
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -18,6 +18,7 @@ public sealed class MetaApiClient(
         PropertyNameCaseInsensitive = true,
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
     };
+    private static readonly int MaxRetries = 5;
 
     public async Task<MetaUserProfile> ExchangeAuthorizationCodeAsync(string code, string redirectUri, CancellationToken cancellationToken)
     {
@@ -68,7 +69,7 @@ public sealed class MetaApiClient(
                   $"&client_secret={options.Value.AppSecret}" +
                   $"&access_token={shortLivedToken}";
 
-        var response = await httpClient.GetAsync(url, cancellationToken);
+        var response = await RetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
         response.EnsureSuccessStatusCode();
 
         var content = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -90,7 +91,7 @@ public sealed class MetaApiClient(
                   $"?grant_type=ig_refresh_token" +
                   $"&access_token={longLivedToken}";
 
-        var response = await httpClient.GetAsync(url, cancellationToken);
+        var response = await RetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
         
         if (!response.IsSuccessStatusCode)
         {
@@ -127,7 +128,7 @@ public sealed class MetaApiClient(
                   $"&redirect_uri={redirectUri}" +
                   $"&code={code}";
 
-        var response = await httpClient.GetAsync(url, cancellationToken);
+        var response = await RetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
         
         if (!response.IsSuccessStatusCode)
         {
@@ -153,7 +154,7 @@ public sealed class MetaApiClient(
     {
         var url = $"{options.Value.GraphApiBaseUrl}/me?fields=id,name,email&access_token={accessToken}";
         
-        var response = await httpClient.GetAsync(url, cancellationToken);
+        var response = await RetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
         
         if (!response.IsSuccessStatusCode)
         {
@@ -177,7 +178,7 @@ public sealed class MetaApiClient(
     {
         var url = $"{options.Value.GraphApiBaseUrl}/me/accounts?fields=instagram_business_account&access_token={accessToken}";
         
-        var response = await httpClient.GetAsync(url, cancellationToken);
+        var response = await RetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
         
         if (!response.IsSuccessStatusCode)
         {
@@ -204,7 +205,7 @@ public sealed class MetaApiClient(
         var igAccountId = firstPageWithIg.InstagramBusinessAccount.Id;
         var igUrl = $"{options.Value.GraphApiBaseUrl}/{igAccountId}?fields=username,ig_id&access_token={accessToken}";
         
-        var igResponse = await httpClient.GetAsync(igUrl, cancellationToken);
+        var igResponse = await RetryAsync(() => httpClient.GetAsync(igUrl, cancellationToken), cancellationToken);
         
         if (!igResponse.IsSuccessStatusCode)
         {
@@ -230,4 +231,43 @@ public sealed class MetaApiClient(
     private record MetaPage(string Id, MetaInstagramBusinessAccount? InstagramBusinessAccount);
     private record MetaPagesResponse(List<MetaPage> Data);
     private record MetaInstagramAccount(string Id, string Username, string IgId);
+
+    private async Task<HttpResponseMessage> RetryAsync(Func<Task<HttpResponseMessage>> requestFunc, CancellationToken cancellationToken)
+    {
+        for (int attempt = 0; attempt < MaxRetries; attempt++)
+        {
+            try
+            {
+                var response = await requestFunc();
+                
+                if (response.IsSuccessStatusCode || IsNonRetriableStatus(response.StatusCode))
+                {
+                    return response;
+                }
+
+                logger.LogWarning("Meta API request failed with status {StatusCode}, attempt {Attempt}/{MaxRetries}", response.StatusCode, attempt + 1, MaxRetries);
+            }
+            catch (HttpRequestException ex)
+            {
+                logger.LogWarning(ex, "Meta API request failed on attempt {Attempt}/{MaxRetries}", attempt + 1, MaxRetries);
+            }
+
+            if (attempt < MaxRetries - 1)
+            {
+                var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt));
+                await Task.Delay(delay, cancellationToken);
+            }
+        }
+
+        return await requestFunc();
+    }
+
+    private static bool IsNonRetriableStatus(System.Net.HttpStatusCode statusCode)
+    {
+        return statusCode is
+            System.Net.HttpStatusCode.BadRequest or
+            System.Net.HttpStatusCode.Unauthorized or
+            System.Net.HttpStatusCode.Forbidden or
+            System.Net.HttpStatusCode.NotFound;
+    }
 }
