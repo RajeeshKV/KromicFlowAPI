@@ -53,6 +53,44 @@ namespace KromicFlow.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "DeadLetterEvents",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    EventType = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    Payload = table.Column<string>(type: "jsonb", nullable: false),
+                    Error = table.Column<string>(type: "text", nullable: true),
+                    FailedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    RetryCount = table.Column<int>(type: "integer", nullable: false),
+                    CreatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    Version = table.Column<long>(type: "bigint", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_DeadLetterEvents", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "OutboxEvents",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    EventType = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    Payload = table.Column<string>(type: "jsonb", nullable: false),
+                    ProcessedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    Error = table.Column<string>(type: "text", nullable: true),
+                    RetryCount = table.Column<int>(type: "integer", nullable: false),
+                    CreatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    Version = table.Column<long>(type: "bigint", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_OutboxEvents", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Plans",
                 columns: table => new
                 {
@@ -155,9 +193,10 @@ namespace KromicFlow.Infrastructure.Migrations
                     RefreshRequired = table.Column<bool>(type: "boolean", nullable: false),
                     ConnectedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     LastSyncUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    TokenExpiresUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     CreatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    Version = table.Column<long>(type: "bigint", nullable: false)
+                    xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -217,7 +256,7 @@ namespace KromicFlow.Infrastructure.Migrations
                     RevokedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     CreatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    Version = table.Column<long>(type: "bigint", nullable: false)
+                    xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -328,7 +367,7 @@ namespace KromicFlow.Infrastructure.Migrations
                     ActiveUntilUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     CreatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    Version = table.Column<long>(type: "bigint", nullable: false)
+                    xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -374,6 +413,11 @@ namespace KromicFlow.Infrastructure.Migrations
                 column: "InstagramAccountId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_DeadLetterEvents_FailedUtc",
+                table: "DeadLetterEvents",
+                column: "FailedUtc");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_InstagramAccounts_UserId_InstagramUserId",
                 table: "InstagramAccounts",
                 columns: new[] { "UserId", "InstagramUserId" },
@@ -388,6 +432,16 @@ namespace KromicFlow.Infrastructure.Migrations
                 name: "IX_NotificationMessages_UserId",
                 table: "NotificationMessages",
                 column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_OutboxEvents_CreatedUtc",
+                table: "OutboxEvents",
+                column: "CreatedUtc");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_OutboxEvents_ProcessedUtc",
+                table: "OutboxEvents",
+                column: "ProcessedUtc");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Plans_Code",
@@ -405,6 +459,12 @@ namespace KromicFlow.Infrastructure.Migrations
                 name: "IX_Sessions_AdminUserId",
                 table: "Sessions",
                 column: "AdminUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Sessions_RefreshTokenHash",
+                table: "Sessions",
+                column: "RefreshTokenHash",
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Sessions_SessionGuid",
@@ -467,7 +527,13 @@ namespace KromicFlow.Infrastructure.Migrations
                 name: "Automations");
 
             migrationBuilder.DropTable(
+                name: "DeadLetterEvents");
+
+            migrationBuilder.DropTable(
                 name: "NotificationMessages");
+
+            migrationBuilder.DropTable(
+                name: "OutboxEvents");
 
             migrationBuilder.DropTable(
                 name: "RuntimeSettings");

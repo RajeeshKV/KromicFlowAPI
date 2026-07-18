@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace KromicFlow.Infrastructure.Migrations
 {
     [DbContext(typeof(KromicFlowDbContext))]
-    [Migration("20260718145535_OutboxChanges")]
-    partial class OutboxChanges
+    [Migration("20260718151048_InitialMigration")]
+    partial class InitialMigration
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
