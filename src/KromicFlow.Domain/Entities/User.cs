@@ -4,7 +4,7 @@ namespace KromicFlow.Domain.Entities;
 
 public sealed class User : Entity
 {
-    public string Email { get; set; } = string.Empty;
+    public string? Email { get; set; }
     public string FullName { get; set; } = string.Empty;
     public UserRole Role { get; set; } = UserRole.User;
     public int TokenVersion { get; set; }
