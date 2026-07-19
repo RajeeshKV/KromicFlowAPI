@@ -322,18 +322,15 @@ public sealed class MetaApiClient(
 
     public async Task SubscribeToWebhooksAsync(string accessToken, string instagramUserId, CancellationToken cancellationToken)
     {
-        logger.LogInformation("Subscribing to Instagram webhooks for user {InstagramUserId}", instagramUserId);
+        logger.LogInformation("Subscribing Instagram account {InstagramUserId} to webhooks", instagramUserId);
 
         var query = new Dictionary<string, string>
         {
-            ["access_token"] = accessToken,
-            ["object"] = "instagram",
-            ["callback_url"] = options.Value.WebhookCallbackUrl,
-            ["verify_token"] = options.Value.WebhookVerifyToken,
-            ["fields"] = "comments,mentions"
+            ["subscribed_fields"] = "comments,mentions",
+            ["access_token"] = accessToken
         };
 
-        var url = QueryHelpers.AddQueryString($"{options.Value.GraphApiBaseUrl}/{options.Value.AppId}/subscriptions", query);
+        var url = QueryHelpers.AddQueryString($"{options.Value.GraphApiBaseUrl}/{instagramUserId}/subscribed_apps", query);
         logger.LogInformation("Webhook subscription URL: {Url}", SanitizeSensitiveData(url));
 
         var response = await RetryAsync(() => httpClient.PostAsync(url, null, cancellationToken), cancellationToken);
