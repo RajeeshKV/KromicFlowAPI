@@ -54,7 +54,7 @@ internal sealed class MetaCallbackCommandHandler(
             
             if (existingAccount is null)
             {
-                // New account - mark as disconnected by default
+                // New account - mark as connected since user just authenticated
                 var newAccount = new InstagramAccount
                 {
                     User = user,
@@ -67,14 +67,15 @@ internal sealed class MetaCallbackCommandHandler(
                     TokenExpiresUtc = tokenExpiry,
                     LastTokenRefreshUtc = DateTime.UtcNow,
                     TokenStatus = "active",
-                    IsConnected = false, // Newly discovered accounts are disconnected by default
+                    IsConnected = true, // Auto-connect after OAuth authentication
+                    ConnectedAtUtc = DateTime.UtcNow,
                     RefreshRequired = false
                 };
                 db.InstagramAccounts.Add(newAccount);
             }
             else
             {
-                // Update existing account
+                // Update existing account - re-connect since user just authenticated
                 existingAccount.FacebookPageId = igAccount.PageId;
                 existingAccount.Username = igAccount.Username;
                 existingAccount.DisplayName = igAccount.Username;
@@ -85,7 +86,9 @@ internal sealed class MetaCallbackCommandHandler(
                 existingAccount.TokenStatus = "active";
                 existingAccount.RefreshRequired = false;
                 existingAccount.UpdatedUtc = DateTime.UtcNow;
-                // Preserve existing connection state - don't auto-connect
+                existingAccount.IsConnected = true; // Re-connect on re-authentication
+                existingAccount.ConnectedAtUtc = existingAccount.ConnectedAtUtc ?? DateTime.UtcNow;
+                existingAccount.DisconnectedAtUtc = null; // Clear disconnect timestamp
             }
         }
 
