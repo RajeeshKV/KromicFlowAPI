@@ -39,8 +39,28 @@ public sealed class AuthController(IMediator mediator, IConfiguration configurat
     public async Task<IActionResult> Callback([FromQuery] string code, [FromQuery] string state, CancellationToken cancellationToken)
     {
         var redirectUri = configuration["Meta:OAuthRedirectUri"] ?? string.Empty;
+        var frontendRedirectUri = configuration["Meta:FrontendRedirectUri"] ?? string.Empty;
         var result = await mediator.Send(new MetaCallbackCommand(code, state, redirectUri, Request.Headers.UserAgent, null, null, HttpContext.Connection.RemoteIpAddress?.ToString()), cancellationToken);
-        return FromResult(result);
+        
+        if (!result.Succeeded)
+        {
+            var errorUrl = $"{frontendRedirectUri}?error={Uri.EscapeDataString(result.Error ?? "Unknown error")}";
+            return Redirect(errorUrl);
+        }
+        
+        var tokens = result.Value!.Tokens;
+        var profile = result.Value.Profile;
+        var callbackUrl = $"{frontendRedirectUri}#" +
+            $"accessToken={Uri.EscapeDataString(tokens.AccessToken)}" +
+            $"&refreshToken={Uri.EscapeDataString(tokens.RefreshToken)}" +
+            $"&expiresUtc={Uri.EscapeDataString(tokens.ExpiresUtc.ToString("o"))}" +
+            $"&sessionGuid={Uri.EscapeDataString(tokens.SessionGuid.ToString())}" +
+            $"&userId={Uri.EscapeDataString(profile.Id.ToString())}" +
+            $"&email={Uri.EscapeDataString(profile.Email)}" +
+            $"&fullName={Uri.EscapeDataString(profile.FullName)}" +
+            $"&role={Uri.EscapeDataString(profile.Role)}";
+            
+        return Redirect(callbackUrl);
     }
 
     [HttpPost("refresh")]

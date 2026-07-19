@@ -15,6 +15,10 @@ public sealed class MetaOptions
     public string OAuthRedirectUri { get; set; } = string.Empty;
     
     [Required]
+    [Url]
+    public string FrontendRedirectUri { get; set; } = string.Empty;
+    
+    [Required]
     public string WebhookVerifyToken { get; set; } = string.Empty;
     
     [Required]
