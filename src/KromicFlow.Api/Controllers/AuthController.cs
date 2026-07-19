@@ -56,7 +56,7 @@ public sealed class AuthController(IMediator mediator, IConfiguration configurat
             $"&expiresUtc={Uri.EscapeDataString(tokens.ExpiresUtc.ToString("o"))}" +
             $"&sessionGuid={Uri.EscapeDataString(tokens.SessionGuid.ToString())}" +
             $"&userId={Uri.EscapeDataString(profile.Id.ToString())}" +
-            $"&email={Uri.EscapeDataString(profile.Email)}" +
+            $"&email={Uri.EscapeDataString(profile.Email ?? "")}" +
             $"&fullName={Uri.EscapeDataString(profile.FullName)}" +
             $"&role={Uri.EscapeDataString(profile.Role)}";
             
