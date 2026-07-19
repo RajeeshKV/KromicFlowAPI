@@ -46,6 +46,12 @@ internal sealed class GetInstagramMediaQueryHandler(
             {
                 await SyncMediaAsync(account, cancellationToken);
             }
+            catch (InvalidOperationException ex)
+            {
+                logger.LogError(ex, "Media sync failed for account {AccountId} - requires re-authentication", request.InstagramAccountId);
+                // Return error to user indicating they need to re-authenticate
+                return Result<MediaPaginationResponseDto>.Failure("Instagram account requires re-authentication. Please log in again.");
+            }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Media sync failed for account {AccountId}", request.InstagramAccountId);
@@ -102,7 +108,19 @@ internal sealed class GetInstagramMediaQueryHandler(
     {
         logger.LogInformation("Starting media sync for account {AccountId}", account.Id);
 
-        var accessToken = dataProtectionService.Unprotect(account.AccessTokenEncrypted);
+        string accessToken;
+        try
+        {
+            accessToken = dataProtectionService.Unprotect(account.AccessTokenEncrypted);
+        }
+        catch (System.Security.Cryptography.CryptographicException ex)
+        {
+            logger.LogError(ex, "Failed to decrypt access token for account {AccountId} - key not found in key ring", account.Id);
+            account.TokenStatus = "invalid";
+            account.RefreshRequired = true;
+            await db.SaveChangesAsync(cancellationToken);
+            throw new InvalidOperationException("Access token cannot be decrypted. Please re-authenticate your Instagram account.", ex);
+        }
 
         // Refresh token if needed
         if (account.TokenExpiresUtc.HasValue && account.TokenExpiresUtc.Value < DateTime.UtcNow.AddDays(7))
