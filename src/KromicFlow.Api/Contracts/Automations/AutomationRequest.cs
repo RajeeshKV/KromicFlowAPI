@@ -1,3 +1,16 @@
-﻿namespace KromicFlow.Api.Contracts.Automations;
+﻿using KromicFlow.Domain.Enums;
 
-public sealed record AutomationRequest(Guid InstagramAccountId, string Name, string TriggerType, string[] Keywords, string? PublicReply, string? PrivateReply, int CooldownSeconds, int Priority);
+namespace KromicFlow.Api.Contracts.Automations;
+
+public sealed record AutomationRequest(
+    Guid InstagramAccountId,
+    string Name,
+    AutomationScope Scope,
+    string TriggerType,
+    string[] Keywords,
+    string? PublicReply,
+    string? PrivateReply,
+    int CooldownSeconds,
+    int Priority,
+    List<Guid> SelectedMediaIds
+);

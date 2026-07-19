@@ -1,27 +1,47 @@
 ﻿using System.Text.Json;
+using KromicFlow.Application.Abstractions;
 using KromicFlow.Application.DTOs.Automations;
 using KromicFlow.Domain.Entities;
 using KromicFlow.Domain.Enums;
+using Microsoft.EntityFrameworkCore;
 
 namespace KromicFlow.Application.Features.Automations;
 
 internal static class AutomationMapping
 {
-    public static AutomationDto ToDto(Automation automation) => new(
-        automation.Id,
-        automation.InstagramAccountId,
-        automation.Name,
-        automation.TriggerType.ToString(),
-        JsonSerializer.Deserialize<string[]>(automation.KeywordsJson) ?? [],
-        automation.PublicReply,
-        automation.PrivateReply,
-        automation.Enabled,
-        automation.CooldownSeconds,
-        automation.Priority);
+    public static async Task<AutomationDto> ToDtoAsync(Automation automation, IKromicFlowDbContext db, CancellationToken cancellationToken)
+    {
+        var selectedMedia = await db.AutomationMedia
+            .Include(x => x.InstagramMedia)
+            .Where(x => x.AutomationId == automation.Id)
+            .Select(x => new MediaForAutomationDto(
+                x.InstagramMedia.Id,
+                x.InstagramMedia.InstagramMediaId,
+                x.InstagramMedia.Caption,
+                x.InstagramMedia.ThumbnailUrl,
+                x.InstagramMedia.PostedAtUtc
+            ))
+            .ToListAsync(cancellationToken);
 
-    public static void Apply(Automation automation, string name, string triggerType, string[] keywords, string? publicReply, string? privateReply, int cooldownSeconds, int priority)
+        return new AutomationDto(
+            automation.Id,
+            automation.InstagramAccountId,
+            automation.Name,
+            automation.Scope,
+            automation.TriggerType.ToString(),
+            JsonSerializer.Deserialize<string[]>(automation.KeywordsJson) ?? [],
+            automation.PublicReply,
+            automation.PrivateReply,
+            automation.Enabled,
+            automation.CooldownSeconds,
+            automation.Priority,
+            selectedMedia);
+    }
+
+    public static void Apply(Automation automation, string name, AutomationScope scope, string triggerType, string[] keywords, string? publicReply, string? privateReply, int cooldownSeconds, int priority)
     {
         automation.Name = name.Trim();
+        automation.Scope = scope;
         automation.TriggerType = Enum.TryParse<AutomationTriggerType>(triggerType, true, out var parsed) ? parsed : AutomationTriggerType.CommentKeyword;
         automation.KeywordsJson = JsonSerializer.Serialize(keywords.Select(x => x.Trim()).Where(x => x.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase));
         automation.PublicReply = publicReply;

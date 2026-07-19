@@ -9,4 +9,5 @@ public interface IMetaApiClient
     Task<string> RefreshLongLivedTokenAsync(string longLivedToken, CancellationToken cancellationToken);
     Task SyncMediaAsync(InstagramAccount account, CancellationToken cancellationToken);
     Task<MetaInstagramBusinessAccount> RefreshInstagramAccountProfileAsync(string accessToken, string instagramAccountId, CancellationToken cancellationToken);
+    Task<List<MetaInstagramMedia>> GetInstagramMediaAsync(string accessToken, string instagramUserId, CancellationToken cancellationToken);
 }

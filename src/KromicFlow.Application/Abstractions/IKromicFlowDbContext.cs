@@ -11,7 +11,9 @@ public interface IKromicFlowDbContext
     DbSet<Plan> Plans { get; }
     DbSet<UserRestriction> UserRestrictions { get; }
     DbSet<InstagramAccount> InstagramAccounts { get; }
+    DbSet<InstagramMedia> InstagramMedia { get; }
     DbSet<Automation> Automations { get; }
+    DbSet<AutomationMedia> AutomationMedia { get; }
     DbSet<WebhookEvent> WebhookEvents { get; }
     DbSet<AuditLog> AuditLogs { get; }
     DbSet<UserActivity> UserActivities { get; }

@@ -17,6 +17,6 @@ internal sealed class SetAutomationEnabledCommandHandler(IKromicFlowDbContext db
         automation.UpdatedUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
         await auditWriter.WriteAsync(request.Enabled ? "AutomationEnabled" : "AutomationDisabled", nameof(Automation), automation.Id.ToString(), request.UserId, null, null, cancellationToken);
-        return Result<AutomationDto>.Success(AutomationMapping.ToDto(automation));
+        return Result<AutomationDto>.Success(await AutomationMapping.ToDtoAsync(automation, db, cancellationToken));
     }
 }

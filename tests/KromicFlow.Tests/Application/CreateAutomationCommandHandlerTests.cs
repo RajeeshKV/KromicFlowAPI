@@ -1,6 +1,8 @@
 ﻿using KromicFlow.Application.Abstractions;
 using KromicFlow.Application.Features.Automations.CreateAutomation;
+using KromicFlow.Application.Services;
 using KromicFlow.Domain.Entities;
+using KromicFlow.Domain.Enums;
 using KromicFlow.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,8 +24,8 @@ public sealed class CreateAutomationCommandHandlerTests
         db.Automations.Add(new Automation { InstagramAccount = account, Name = "Existing" });
         await db.SaveChangesAsync();
 
-        var handler = new CreateAutomationCommandHandler(db, new NoopAuditWriter());
-        var result = await handler.Handle(new CreateAutomationCommand(user.Id, account.Id, "New", "CommentKeyword", ["hi"], "hello", null, 0, 0), CancellationToken.None);
+        var handler = new CreateAutomationCommandHandler(db, new NoopAuditWriter(), new NoopAutomationScopeService());
+        var result = await handler.Handle(new CreateAutomationCommand(user.Id, account.Id, "New", AutomationScope.SpecificPosts, "CommentKeyword", ["hi"], "hello", null, 0, 0, []), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         Assert.Equal("Plan automation limit reached.", result.Error);
@@ -32,5 +34,11 @@ public sealed class CreateAutomationCommandHandlerTests
     private sealed class NoopAuditWriter : IAuditWriter
     {
         public Task WriteAsync(string action, string entityName, string? entityId, Guid? actorUserId, Guid? actorAdminId, string? detailsJson, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    private sealed class NoopAutomationScopeService : IAutomationScopeService
+    {
+        public Task<bool> IsAutomationApplicableAsync(Guid automationId, string instagramMediaId, CancellationToken cancellationToken) => Task.FromResult(true);
+        public Task<bool> ValidateAutomationScopeAsync(AutomationScope scope, Guid automationId, List<Guid> selectedMediaIds, CancellationToken cancellationToken) => Task.FromResult(true);
     }
 }

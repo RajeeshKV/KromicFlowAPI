@@ -44,6 +44,7 @@ public static class DependencyInjection
         services.AddScoped<IDataProtectionService, DataProtectionService>();
         services.AddScoped<IOutboxEventPublisher, OutboxEventPublisher>();
         services.AddScoped<IAutomationEligibilityService, AutomationEligibilityService>();
+        services.AddScoped<IAutomationScopeService, AutomationScopeService>();
         services.AddHttpClient<IMetaApiClient, MetaApiClient>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(30);

@@ -273,10 +273,54 @@ public sealed class MetaApiClient(
         );
     }
 
+    public async Task<List<MetaInstagramMedia>> GetInstagramMediaAsync(string accessToken, string instagramUserId, CancellationToken cancellationToken)
+    {
+        var query = new Dictionary<string, string>
+        {
+            ["fields"] = "id,media_type,caption,thumbnail_url,media_url,permalink,timestamp,like_count,comments_count",
+            ["access_token"] = accessToken
+        };
+        var url = QueryHelpers.AddQueryString($"{options.Value.GraphApiBaseUrl}/{instagramUserId}/media", query);
+        
+        var response = await RetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
+        
+        if (!response.IsSuccessStatusCode)
+        {
+            logger.LogError("Failed to retrieve Instagram media: {StatusCode}", response.StatusCode);
+            throw new MetaApiException($"Failed to retrieve Instagram media: {response.StatusCode}");
+        }
+
+        var content = await response.Content.ReadAsStringAsync(cancellationToken);
+        var result = JsonSerializer.Deserialize<MetaMediaResponse>(content, _jsonOptions);
+
+        if (result?.Data == null)
+        {
+            logger.LogWarning("No Instagram media found");
+            return [];
+        }
+
+        var mediaList = result.Data.Select(m => new MetaInstagramMedia(
+            Id: m.Id,
+            MediaType: m.MediaType,
+            Caption: m.Caption ?? string.Empty,
+            ThumbnailUrl: m.ThumbnailUrl ?? string.Empty,
+            MediaUrl: m.MediaUrl ?? string.Empty,
+            Permalink: m.Permalink ?? string.Empty,
+            PostedAtUtc: DateTime.TryParse(m.Timestamp, out var posted) ? posted : DateTime.UtcNow,
+            LikeCount: m.LikeCount ?? 0,
+            CommentsCount: m.CommentsCount ?? 0
+        )).ToList();
+
+        logger.LogInformation("Retrieved {Count} Instagram media items", mediaList.Count);
+        return mediaList;
+    }
+
     private record MetaTokenResponse(string? AccessToken, string? TokenType, long? ExpiresIn);
     private record MetaUser(string UserId, string Username);
     private record MetaInstagramBusinessAccountResponse(string Id, string Username, string? ProfilePictureUrl, string? AccountType);
     private record MetaInstagramProfileResponse(string Username, string ProfilePictureUrl);
+    private record MetaMediaItem(string Id, string MediaType, string? Caption, string? ThumbnailUrl, string? MediaUrl, string? Permalink, string Timestamp, int? LikeCount, int? CommentsCount);
+    private record MetaMediaResponse(List<MetaMediaItem> Data);
 
     private async Task<HttpResponseMessage> RetryAsync(Func<Task<HttpResponseMessage>> requestFunc, CancellationToken cancellationToken)
     {

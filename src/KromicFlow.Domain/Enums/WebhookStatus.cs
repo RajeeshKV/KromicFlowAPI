@@ -6,5 +6,6 @@ public enum WebhookStatus
     Processing = 1,
     Completed = 2,
     Failed = 3,
-    DeadLetter = 4
+    DeadLetter = 4,
+    Skipped = 5
 }

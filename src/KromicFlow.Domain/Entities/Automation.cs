@@ -7,6 +7,7 @@ public sealed class Automation : Entity
     public Guid InstagramAccountId { get; set; }
     public InstagramAccount InstagramAccount { get; set; } = null!;
     public string Name { get; set; } = string.Empty;
+    public AutomationScope Scope { get; set; } = AutomationScope.SpecificPosts;
     public AutomationTriggerType TriggerType { get; set; }
     public string KeywordsJson { get; set; } = "[]";
     public string? PublicReply { get; set; }
@@ -16,4 +17,6 @@ public sealed class Automation : Entity
     public int Priority { get; set; }
     public DateTime? ActiveFromUtc { get; set; }
     public DateTime? ActiveUntilUtc { get; set; }
+    
+    public ICollection<AutomationMedia> AutomationMedia { get; set; } = [];
 }

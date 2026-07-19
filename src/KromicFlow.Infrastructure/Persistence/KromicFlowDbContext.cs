@@ -13,7 +13,9 @@ public sealed class KromicFlowDbContext(DbContextOptions<KromicFlowDbContext> op
     public DbSet<Plan> Plans => Set<Plan>();
     public DbSet<UserRestriction> UserRestrictions => Set<UserRestriction>();
     public DbSet<InstagramAccount> InstagramAccounts => Set<InstagramAccount>();
+    public DbSet<InstagramMedia> InstagramMedia => Set<InstagramMedia>();
     public DbSet<Automation> Automations => Set<Automation>();
+    public DbSet<AutomationMedia> AutomationMedia => Set<AutomationMedia>();
     public DbSet<WebhookEvent> WebhookEvents => Set<WebhookEvent>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<UserActivity> UserActivities => Set<UserActivity>();
@@ -164,14 +166,39 @@ public sealed class KromicFlowDbContext(DbContextOptions<KromicFlowDbContext> op
         modelBuilder.Entity<Automation>(entity =>
         {
             entity.HasIndex(x => x.InstagramAccountId);
+            entity.HasIndex(x => x.Scope);
             entity.HasIndex(x => x.Enabled);
             entity.Property(x => x.TriggerType).HasConversion<string>().HasMaxLength(80);
+            entity.Property(x => x.Scope).HasConversion<string>().HasMaxLength(80);
             entity.Property(x => x.Name).HasMaxLength(160);
             entity.Property(x => x.KeywordsJson).HasColumnType("jsonb");
             entity.Property(x => x.PublicReply).HasMaxLength(2000);
             entity.Property(x => x.PrivateReply).HasMaxLength(2000);
             entity.Property(x => x.Version).IsRowVersion();
             entity.HasOne(x => x.InstagramAccount).WithMany(x => x.Automations).HasForeignKey(x => x.InstagramAccountId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<InstagramMedia>(entity =>
+        {
+            entity.HasIndex(x => x.InstagramMediaId).IsUnique();
+            entity.HasIndex(x => x.InstagramAccountId);
+            entity.HasIndex(x => x.PostedAtUtc);
+            entity.HasIndex(x => x.MediaType);
+            entity.Property(x => x.MediaType).HasConversion<string>().HasMaxLength(80);
+            entity.Property(x => x.Caption).HasMaxLength(2200);
+            entity.Property(x => x.ThumbnailUrl).HasMaxLength(1000);
+            entity.Property(x => x.MediaUrl).HasMaxLength(1000);
+            entity.Property(x => x.Permalink).HasMaxLength(1000);
+            entity.HasOne(x => x.InstagramAccount).WithMany().HasForeignKey(x => x.InstagramAccountId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<AutomationMedia>(entity =>
+        {
+            entity.HasIndex(x => x.AutomationId);
+            entity.HasIndex(x => x.InstagramMediaId);
+            entity.HasIndex(x => new { x.AutomationId, x.InstagramMediaId }).IsUnique();
+            entity.HasOne(x => x.Automation).WithMany(x => x.AutomationMedia).HasForeignKey(x => x.AutomationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.InstagramMedia).WithMany(x => x.AutomationMedia).HasForeignKey(x => x.InstagramMediaId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 
