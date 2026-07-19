@@ -142,21 +142,18 @@ internal sealed class PersistMetaWebhookCommandHandler(
             if (root.TryGetProperty("entry", out var entries) && entries.GetArrayLength() > 0)
             {
                 var entry = entries[0];
+                
+                // Extract Instagram account ID from entry level (account that owns the media)
+                if (entry.TryGetProperty("id", out var entryId))
+                {
+                    instagramAccountId = entryId.GetString();
+                }
+                
                 if (entry.TryGetProperty("changes", out var changes) && changes.GetArrayLength() > 0)
                 {
                     var change = changes[0];
                     if (change.TryGetProperty("value", out var value))
                     {
-                        // Extract Instagram account ID
-                        if (value.TryGetProperty("from", out var from) && from.TryGetProperty("id", out var id))
-                        {
-                            instagramAccountId = id.GetString();
-                        }
-                        if (value.TryGetProperty("instagram_user_id", out var igUserId))
-                        {
-                            instagramAccountId = igUserId.GetString();
-                        }
-                        
                         // Extract media ID
                         if (value.TryGetProperty("media", out var media))
                         {
