@@ -282,20 +282,25 @@ public sealed class MetaApiClient(
         };
         var url = QueryHelpers.AddQueryString($"{options.Value.GraphApiBaseUrl}/{instagramUserId}/media", query);
         
+        logger.LogInformation("Requesting media from Instagram API: {Url}", url);
+        
         var response = await RetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
         
         if (!response.IsSuccessStatusCode)
         {
-            logger.LogError("Failed to retrieve Instagram media: {StatusCode}", response.StatusCode);
-            throw new MetaApiException($"Failed to retrieve Instagram media: {response.StatusCode}");
+            var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+            logger.LogError("Failed to retrieve Instagram media: {StatusCode} - {Content}", response.StatusCode, errorContent);
+            throw new MetaApiException($"Failed to retrieve Instagram media: {response.StatusCode} - {errorContent}");
         }
 
         var content = await response.Content.ReadAsStringAsync(cancellationToken);
+        logger.LogInformation("Instagram API response: {Content}", content);
+        
         var result = JsonSerializer.Deserialize<MetaMediaResponse>(content, _jsonOptions);
 
         if (result?.Data == null)
         {
-            logger.LogWarning("No Instagram media found");
+            logger.LogWarning("No Instagram media found in response");
             return [];
         }
 
