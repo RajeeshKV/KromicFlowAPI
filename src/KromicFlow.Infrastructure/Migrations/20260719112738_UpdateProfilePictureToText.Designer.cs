@@ -3,6 +3,7 @@ using System;
 using KromicFlow.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace KromicFlow.Infrastructure.Migrations
 {
     [DbContext(typeof(KromicFlowDbContext))]
-    partial class KromicFlowDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260719112738_UpdateProfilePictureToText")]
+    partial class UpdateProfilePictureToText
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -316,7 +319,8 @@ namespace KromicFlow.Infrastructure.Migrations
 
                     b.Property<string>("ProfilePicture")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<bool>("RefreshRequired")
                         .HasColumnType("boolean");
