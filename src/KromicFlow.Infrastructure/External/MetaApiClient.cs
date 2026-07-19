@@ -41,8 +41,8 @@ public sealed class MetaApiClient(
             logger.LogInformation("Retrieving Instagram user profile");
             var userProfile = await GetUserProfileAsync(longLivedToken, cancellationToken);
             
-            logger.LogInformation("Retrieving all Instagram business accounts via Facebook Pages");
-            var instagramAccounts = await GetAllInstagramBusinessAccountsAsync(longLivedToken, cancellationToken);
+            logger.LogInformation("Retrieving Instagram business account");
+            var instagramAccounts = await GetInstagramBusinessAccountAsync(longLivedToken, cancellationToken);
 
             return new MetaUserProfile(
                 MetaUserId: userProfile.UserId,
@@ -194,47 +194,47 @@ public sealed class MetaApiClient(
         return result;
     }
 
-    private async Task<List<MetaInstagramBusinessAccount>> GetAllInstagramBusinessAccountsAsync(string accessToken, CancellationToken cancellationToken)
+    private async Task<List<MetaInstagramBusinessAccount>> GetInstagramBusinessAccountAsync(string accessToken, CancellationToken cancellationToken)
     {
+        // For Instagram OAuth, we get the Instagram account directly from the user profile
+        // The user profile already contains the Instagram user ID and username
+        // We need to get additional business account details
         var query = new Dictionary<string, string>
         {
-            ["fields"] = "instagram_business_account{id,username,profile_picture_url}",
+            ["fields"] = "id,username,profile_picture_url,account_type",
             ["access_token"] = accessToken
         };
-        var url = QueryHelpers.AddQueryString($"{options.Value.GraphApiBaseUrl}/me/accounts", query);
+        var url = QueryHelpers.AddQueryString($"{options.Value.GraphApiBaseUrl}/me", query);
         
         var response = await RetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
         
         if (!response.IsSuccessStatusCode)
         {
-            logger.LogError("Failed to retrieve Facebook Pages: {StatusCode}", response.StatusCode);
-            throw new MetaApiException($"Failed to retrieve Facebook Pages: {response.StatusCode}");
-        }
-
-        var content = await response.Content.ReadAsStringAsync(cancellationToken);
-        var pagesResponse = JsonSerializer.Deserialize<MetaPagesResponse>(content, _jsonOptions);
-
-        if (pagesResponse?.Data == null || pagesResponse.Data.Count == 0)
-        {
-            logger.LogWarning("No Facebook Pages found for user");
+            logger.LogError("Failed to retrieve Instagram business account: {StatusCode}", response.StatusCode);
+            // Return empty list instead of throwing - single account flow will work
             return [];
         }
 
-        var instagramAccounts = new List<MetaInstagramBusinessAccount>();
-        foreach (var page in pagesResponse.Data)
+        var content = await response.Content.ReadAsStringAsync(cancellationToken);
+        var result = JsonSerializer.Deserialize<MetaInstagramBusinessAccountResponse>(content, _jsonOptions);
+
+        if (result == null)
         {
-            if (page.InstagramBusinessAccount != null)
-            {
-                instagramAccounts.Add(new MetaInstagramBusinessAccount(
-                    PageId: page.Id,
-                    InstagramAccountId: page.InstagramBusinessAccount.Id,
-                    Username: page.InstagramBusinessAccount.Username,
-                    ProfilePicture: page.InstagramBusinessAccount.ProfilePictureUrl
-                ));
-            }
+            logger.LogWarning("No Instagram business account found");
+            return [];
         }
 
-        logger.LogInformation("Found {Count} Instagram business accounts", instagramAccounts.Count);
+        var instagramAccounts = new List<MetaInstagramBusinessAccount>
+        {
+            new MetaInstagramBusinessAccount(
+                PageId: string.Empty, // Not applicable for direct Instagram flow
+                InstagramAccountId: result.Id,
+                Username: result.Username,
+                ProfilePicture: result.ProfilePictureUrl ?? string.Empty
+            )
+        };
+
+        logger.LogInformation("Found {Count} Instagram business account", instagramAccounts.Count);
         return instagramAccounts;
     }
 
@@ -275,9 +275,7 @@ public sealed class MetaApiClient(
 
     private record MetaTokenResponse(string? AccessToken, string? TokenType, long? ExpiresIn);
     private record MetaUser(string UserId, string Username);
-    private record MetaInstagramBusinessAccountDetails(string Id, string Username, string ProfilePictureUrl);
-    private record MetaPage(string Id, MetaInstagramBusinessAccountDetails? InstagramBusinessAccount);
-    private record MetaPagesResponse(List<MetaPage> Data);
+    private record MetaInstagramBusinessAccountResponse(string Id, string Username, string? ProfilePictureUrl, string? AccountType);
     private record MetaInstagramProfileResponse(string Username, string ProfilePictureUrl);
 
     private async Task<HttpResponseMessage> RetryAsync(Func<Task<HttpResponseMessage>> requestFunc, CancellationToken cancellationToken)
