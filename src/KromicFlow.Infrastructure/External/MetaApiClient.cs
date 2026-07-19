@@ -44,11 +44,15 @@ public sealed class MetaApiClient(
             logger.LogInformation("Retrieving Instagram business account");
             var instagramAccounts = await GetInstagramBusinessAccountAsync(longLivedToken, cancellationToken);
 
+            // Use Instagram-scoped ID from business account for webhook compatibility
+            var instagramUserId = instagramAccounts.FirstOrDefault()?.InstagramAccountId ?? userProfile.UserId;
+            logger.LogInformation("Using Instagram account ID: {InstagramUserId}", instagramUserId);
+
             return new MetaUserProfile(
                 MetaUserId: userProfile.UserId,
                 Email: null, // Instagram doesn't provide email in OAuth flow
                 FullName: userProfile.Username,
-                InstagramUserId: userProfile.UserId,
+                InstagramUserId: instagramUserId,
                 InstagramUsername: userProfile.Username,
                 AccessToken: longLivedToken,
                 InstagramAccounts: instagramAccounts);
@@ -206,6 +210,8 @@ public sealed class MetaApiClient(
         };
         var url = QueryHelpers.AddQueryString($"{options.Value.GraphApiBaseUrl}/me", query);
         
+        logger.LogInformation("Requesting Instagram business account from: {Url}", url);
+        
         var response = await RetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
         
         if (!response.IsSuccessStatusCode)
@@ -216,6 +222,7 @@ public sealed class MetaApiClient(
         }
 
         var content = await response.Content.ReadAsStringAsync(cancellationToken);
+        logger.LogInformation("Instagram business account response: {Content}", content);
         var result = JsonSerializer.Deserialize<MetaInstagramBusinessAccountResponse>(content, _jsonOptions);
 
         if (result == null)
@@ -223,6 +230,8 @@ public sealed class MetaApiClient(
             logger.LogWarning("No Instagram business account found");
             return [];
         }
+
+        logger.LogInformation("Extracted Instagram account ID from OAuth: {InstagramAccountId}", result.Id);
 
         var instagramAccounts = new List<MetaInstagramBusinessAccount>
         {
