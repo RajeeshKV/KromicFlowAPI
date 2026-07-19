@@ -311,7 +311,7 @@ public sealed class MetaApiClient(
             ThumbnailUrl: m.ThumbnailUrl ?? string.Empty,
             MediaUrl: m.MediaUrl ?? string.Empty,
             Permalink: m.Permalink ?? string.Empty,
-            PostedAtUtc: DateTime.TryParse(m.Timestamp, out var posted) ? posted : DateTime.UtcNow,
+            PostedAtUtc: DateTime.TryParse(m.Timestamp, out var posted) ? DateTime.SpecifyKind(posted, DateTimeKind.Utc) : DateTime.UtcNow,
             LikeCount: m.LikeCount ?? 0,
             CommentsCount: m.CommentsCount ?? 0
         )).ToList();
