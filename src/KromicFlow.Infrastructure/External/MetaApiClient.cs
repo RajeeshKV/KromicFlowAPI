@@ -40,6 +40,9 @@ public sealed class MetaApiClient(
             
             logger.LogInformation("Retrieving Instagram user profile");
             var userProfile = await GetUserProfileAsync(longLivedToken, cancellationToken);
+            
+            logger.LogInformation("Retrieving all Instagram business accounts via Facebook Pages");
+            var instagramAccounts = await GetAllInstagramBusinessAccountsAsync(longLivedToken, cancellationToken);
 
             return new MetaUserProfile(
                 MetaUserId: userProfile.UserId,
@@ -47,7 +50,8 @@ public sealed class MetaApiClient(
                 FullName: userProfile.Username,
                 InstagramUserId: userProfile.UserId,
                 InstagramUsername: userProfile.Username,
-                AccessToken: longLivedToken);
+                AccessToken: longLivedToken,
+                InstagramAccounts: instagramAccounts);
         }
         catch (HttpRequestException ex)
         {
@@ -190,8 +194,91 @@ public sealed class MetaApiClient(
         return result;
     }
 
+    private async Task<List<MetaInstagramBusinessAccount>> GetAllInstagramBusinessAccountsAsync(string accessToken, CancellationToken cancellationToken)
+    {
+        var query = new Dictionary<string, string>
+        {
+            ["fields"] = "instagram_business_account{id,username,profile_picture_url}",
+            ["access_token"] = accessToken
+        };
+        var url = QueryHelpers.AddQueryString($"{options.Value.GraphApiBaseUrl}/me/accounts", query);
+        
+        var response = await RetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
+        
+        if (!response.IsSuccessStatusCode)
+        {
+            logger.LogError("Failed to retrieve Facebook Pages: {StatusCode}", response.StatusCode);
+            throw new MetaApiException($"Failed to retrieve Facebook Pages: {response.StatusCode}");
+        }
+
+        var content = await response.Content.ReadAsStringAsync(cancellationToken);
+        var pagesResponse = JsonSerializer.Deserialize<MetaPagesResponse>(content, _jsonOptions);
+
+        if (pagesResponse?.Data == null || pagesResponse.Data.Count == 0)
+        {
+            logger.LogWarning("No Facebook Pages found for user");
+            return [];
+        }
+
+        var instagramAccounts = new List<MetaInstagramBusinessAccount>();
+        foreach (var page in pagesResponse.Data)
+        {
+            if (page.InstagramBusinessAccount != null)
+            {
+                instagramAccounts.Add(new MetaInstagramBusinessAccount(
+                    PageId: page.Id,
+                    InstagramAccountId: page.InstagramBusinessAccount.Id,
+                    Username: page.InstagramBusinessAccount.Username,
+                    ProfilePicture: page.InstagramBusinessAccount.ProfilePictureUrl
+                ));
+            }
+        }
+
+        logger.LogInformation("Found {Count} Instagram business accounts", instagramAccounts.Count);
+        return instagramAccounts;
+    }
+
+    public async Task<MetaInstagramBusinessAccount> RefreshInstagramAccountProfileAsync(string accessToken, string instagramAccountId, CancellationToken cancellationToken)
+    {
+        var query = new Dictionary<string, string>
+        {
+            ["fields"] = "username,profile_picture_url",
+            ["access_token"] = accessToken
+        };
+        var url = QueryHelpers.AddQueryString($"{options.Value.GraphApiBaseUrl}/{instagramAccountId}", query);
+        
+        var response = await RetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
+        
+        if (!response.IsSuccessStatusCode)
+        {
+            logger.LogError("Failed to refresh Instagram account profile: {StatusCode}", response.StatusCode);
+            throw new MetaApiException($"Failed to refresh Instagram account profile: {response.StatusCode}");
+        }
+
+        var content = await response.Content.ReadAsStringAsync(cancellationToken);
+        var result = JsonSerializer.Deserialize<MetaInstagramProfileResponse>(content, _jsonOptions);
+
+        if (result == null)
+        {
+            logger.LogError("Meta API returned invalid profile response");
+            throw new MetaApiException("Invalid profile response from Meta API");
+        }
+
+        logger.LogInformation("Successfully refreshed Instagram account profile for {AccountId}", instagramAccountId);
+        return new MetaInstagramBusinessAccount(
+            PageId: string.Empty, // Not available in profile refresh
+            InstagramAccountId: instagramAccountId,
+            Username: result.Username,
+            ProfilePicture: result.ProfilePictureUrl
+        );
+    }
+
     private record MetaTokenResponse(string? AccessToken, string? TokenType, long? ExpiresIn);
     private record MetaUser(string UserId, string Username);
+    private record MetaInstagramBusinessAccountDetails(string Id, string Username, string ProfilePictureUrl);
+    private record MetaPage(string Id, MetaInstagramBusinessAccountDetails? InstagramBusinessAccount);
+    private record MetaPagesResponse(List<MetaPage> Data);
+    private record MetaInstagramProfileResponse(string Username, string ProfilePictureUrl);
 
     private async Task<HttpResponseMessage> RetryAsync(Func<Task<HttpResponseMessage>> requestFunc, CancellationToken cancellationToken)
     {

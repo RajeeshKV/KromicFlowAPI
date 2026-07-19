@@ -143,11 +143,21 @@ public sealed class KromicFlowDbContext(DbContextOptions<KromicFlowDbContext> op
     {
         modelBuilder.Entity<InstagramAccount>(entity =>
         {
-            entity.HasIndex(x => new { x.UserId, x.InstagramUserId }).IsUnique();
+            // Unique constraints to prevent duplicate accounts
+            entity.HasIndex(x => x.InstagramUserId).IsUnique();
+            entity.HasIndex(x => x.FacebookPageId).IsUnique();
+            entity.HasIndex(x => new { x.UserId, x.InstagramUserId });
+            
+            // Property configurations
             entity.Property(x => x.InstagramUserId).HasMaxLength(100);
+            entity.Property(x => x.FacebookPageId).HasMaxLength(100);
             entity.Property(x => x.Username).HasMaxLength(160);
+            entity.Property(x => x.DisplayName).HasMaxLength(200);
+            entity.Property(x => x.ProfilePicture).HasMaxLength(500);
             entity.Property(x => x.AccessTokenEncrypted).HasColumnType("text");
+            entity.Property(x => x.TokenStatus).HasMaxLength(20).HasDefaultValue("active");
             entity.Property(x => x.Version).IsRowVersion();
+            
             entity.HasOne(x => x.User).WithMany(x => x.InstagramAccounts).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
         });
 

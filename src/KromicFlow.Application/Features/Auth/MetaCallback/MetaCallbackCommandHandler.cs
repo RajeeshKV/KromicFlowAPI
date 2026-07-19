@@ -43,22 +43,50 @@ internal sealed class MetaCallbackCommandHandler(
         var loginBlocked = await db.UserRestrictions.AnyAsync(x => x.UserId == user.Id && x.LoginBlocked, cancellationToken);
         if (!user.IsActive || loginBlocked) return Result<LoginResponseDto>.Failure("User login is restricted.");
 
-        var account = await db.InstagramAccounts.FirstOrDefaultAsync(x => x.UserId == user.Id && x.InstagramUserId == profile.InstagramUserId, cancellationToken);
         var encryptedToken = dataProtectionService.Protect(profile.AccessToken);
         var tokenExpiry = DateTime.UtcNow.AddDays(60);
         
-        if (account is null)
+        // Upsert all discovered Instagram accounts
+        foreach (var igAccount in profile.InstagramAccounts)
         {
-            account = new InstagramAccount { User = user, InstagramUserId = profile.InstagramUserId, Username = profile.InstagramUsername, AccessTokenEncrypted = encryptedToken, TokenExpiresUtc = tokenExpiry };
-            db.InstagramAccounts.Add(account);
-        }
-        else
-        {
-            account.Username = profile.InstagramUsername;
-            account.AccessTokenEncrypted = encryptedToken;
-            account.TokenExpiresUtc = tokenExpiry;
-            account.RefreshRequired = false;
-            account.UpdatedUtc = DateTime.UtcNow;
+            var existingAccount = await db.InstagramAccounts
+                .FirstOrDefaultAsync(x => x.InstagramUserId == igAccount.InstagramAccountId, cancellationToken);
+            
+            if (existingAccount is null)
+            {
+                // New account - mark as disconnected by default
+                var newAccount = new InstagramAccount
+                {
+                    User = user,
+                    InstagramUserId = igAccount.InstagramAccountId,
+                    FacebookPageId = igAccount.PageId,
+                    Username = igAccount.Username,
+                    DisplayName = igAccount.Username,
+                    ProfilePicture = igAccount.ProfilePicture,
+                    AccessTokenEncrypted = encryptedToken,
+                    TokenExpiresUtc = tokenExpiry,
+                    LastTokenRefreshUtc = DateTime.UtcNow,
+                    TokenStatus = "active",
+                    IsConnected = false, // Newly discovered accounts are disconnected by default
+                    RefreshRequired = false
+                };
+                db.InstagramAccounts.Add(newAccount);
+            }
+            else
+            {
+                // Update existing account
+                existingAccount.FacebookPageId = igAccount.PageId;
+                existingAccount.Username = igAccount.Username;
+                existingAccount.DisplayName = igAccount.Username;
+                existingAccount.ProfilePicture = igAccount.ProfilePicture;
+                existingAccount.AccessTokenEncrypted = encryptedToken;
+                existingAccount.TokenExpiresUtc = tokenExpiry;
+                existingAccount.LastTokenRefreshUtc = DateTime.UtcNow;
+                existingAccount.TokenStatus = "active";
+                existingAccount.RefreshRequired = false;
+                existingAccount.UpdatedUtc = DateTime.UtcNow;
+                // Preserve existing connection state - don't auto-connect
+            }
         }
 
         var refreshToken = refreshTokenService.CreateToken();

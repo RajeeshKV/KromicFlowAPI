@@ -1,5 +1,6 @@
 ﻿using KromicFlow.Application.Abstractions;
 using KromicFlow.Application.Options;
+using KromicFlow.Application.Services;
 using KromicFlow.Infrastructure.Background;
 using KromicFlow.Infrastructure.External;
 using KromicFlow.Infrastructure.Persistence;
@@ -42,6 +43,7 @@ public static class DependencyInjection
         services.AddScoped<IOAuthStateService, OAuthStateService>();
         services.AddScoped<IDataProtectionService, DataProtectionService>();
         services.AddScoped<IOutboxEventPublisher, OutboxEventPublisher>();
+        services.AddScoped<IAutomationEligibilityService, AutomationEligibilityService>();
         services.AddHttpClient<IMetaApiClient, MetaApiClient>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(30);
