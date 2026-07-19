@@ -320,6 +320,35 @@ public sealed class MetaApiClient(
         return mediaList;
     }
 
+    public async Task SubscribeToWebhooksAsync(string accessToken, string instagramUserId, CancellationToken cancellationToken)
+    {
+        logger.LogInformation("Subscribing to Instagram webhooks for user {InstagramUserId}", instagramUserId);
+
+        var query = new Dictionary<string, string>
+        {
+            ["access_token"] = accessToken,
+            ["object"] = "instagram",
+            ["callback_url"] = options.Value.WebhookCallbackUrl,
+            ["verify_token"] = options.Value.WebhookVerifyToken,
+            ["fields"] = "comments,mentions"
+        };
+
+        var url = QueryHelpers.AddQueryString($"{options.Value.GraphApiBaseUrl}/{options.Value.AppId}/subscriptions", query);
+        logger.LogInformation("Webhook subscription URL: {Url}", SanitizeSensitiveData(url));
+
+        var response = await RetryAsync(() => httpClient.PostAsync(url, null, cancellationToken), cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+            logger.LogError("Failed to subscribe to webhooks: {StatusCode} - {Content}", response.StatusCode, errorContent);
+            throw new MetaApiException($"Failed to subscribe to webhooks: {response.StatusCode} - {errorContent}");
+        }
+
+        var content = await response.Content.ReadAsStringAsync(cancellationToken);
+        logger.LogInformation("Webhook subscription successful: {Content}", content);
+    }
+
     private record MetaTokenResponse(string? AccessToken, string? TokenType, long? ExpiresIn);
     private record MetaUser(string UserId, string Username);
     private record MetaInstagramBusinessAccountResponse(string Id, string Username, string? ProfilePictureUrl, string? AccountType);

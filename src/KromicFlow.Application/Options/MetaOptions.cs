@@ -26,6 +26,10 @@ public sealed class MetaOptions
     
     [Required]
     [Url]
+    public string WebhookCallbackUrl { get; set; } = string.Empty;
+    
+    [Required]
+    [Url]
     public string GraphApiBaseUrl { get; set; } = "https://graph.instagram.com/v20.0";
     
     [Required]

@@ -6,6 +6,7 @@ using KromicFlow.Domain.Entities;
 using KromicFlow.Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace KromicFlow.Application.Features.Auth.MetaCallback;
@@ -19,7 +20,8 @@ internal sealed class MetaCallbackCommandHandler(
     IOAuthStateService oauthStateService,
     IDataProtectionService dataProtectionService,
     IOptions<PlatformOptions> platformOptions,
-    IOptions<JwtOptions> jwtOptions) : IRequestHandler<MetaCallbackCommand, Result<LoginResponseDto>>
+    IOptions<JwtOptions> jwtOptions,
+    ILogger<MetaCallbackCommandHandler> logger) : IRequestHandler<MetaCallbackCommand, Result<LoginResponseDto>>
 {
     public async Task<Result<LoginResponseDto>> Handle(MetaCallbackCommand request, CancellationToken cancellationToken)
     {
@@ -90,6 +92,18 @@ internal sealed class MetaCallbackCommandHandler(
                 existingAccount.ConnectedAtUtc = existingAccount.ConnectedAtUtc ?? DateTime.UtcNow;
                 existingAccount.DisconnectedAtUtc = null; // Clear disconnect timestamp
             }
+        }
+
+        // Subscribe to webhooks for the Instagram account
+        try
+        {
+            var decryptedToken = dataProtectionService.Unprotect(encryptedToken);
+            await metaApiClient.SubscribeToWebhooksAsync(decryptedToken, profile.InstagramUserId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // Log but don't fail the login if webhook subscription fails
+            logger.LogWarning(ex, "Failed to subscribe to webhooks for user {InstagramUserId}", profile.InstagramUserId);
         }
 
         var refreshToken = refreshTokenService.CreateToken();
