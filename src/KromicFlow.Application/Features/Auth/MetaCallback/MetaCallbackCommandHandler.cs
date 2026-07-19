@@ -35,7 +35,7 @@ internal sealed class MetaCallbackCommandHandler(
         var user = await db.Users.Include(x => x.Plan).FirstOrDefaultAsync(x => x.Email == profile.Email, cancellationToken);
         if (user is null)
         {
-            user = new User { Email = profile.Email, FullName = profile.FullName, PlanId = plan.Id, Plan = plan };
+            user = new Domain.Entities.User { Email = profile.Email, FullName = profile.FullName, PlanId = plan.Id, Plan = plan };
             db.Users.Add(user);
             db.TermsAcceptances.Add(new TermsAcceptance { User = user, TermsVersion = platformOptions.Value.TermsVersion });
         }

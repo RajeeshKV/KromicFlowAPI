@@ -16,4 +16,5 @@ public sealed class User : Entity
     public UserRestriction? Restriction { get; set; }
     public ICollection<Session> Sessions { get; set; } = [];
     public ICollection<InstagramAccount> InstagramAccounts { get; set; } = [];
+    public ICollection<Automation> Automations { get; set; } = [];
 }

@@ -46,7 +46,7 @@ public sealed class MetaApiClient(
 
             return new MetaUserProfile(
                 MetaUserId: userProfile.UserId,
-                Email: $"{userProfile.Username}@instagram.com",
+                Email: null, // Instagram doesn't provide email in OAuth flow
                 FullName: userProfile.Username,
                 InstagramUserId: userProfile.UserId,
                 InstagramUsername: userProfile.Username,
