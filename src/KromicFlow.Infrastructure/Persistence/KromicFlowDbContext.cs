@@ -214,9 +214,20 @@ public sealed class KromicFlowDbContext(DbContextOptions<KromicFlowDbContext> op
         {
             entity.HasIndex(x => x.EventId).IsUnique();
             entity.HasIndex(x => x.Status);
+            entity.HasIndex(x => x.ReceivedUtc);
+            entity.HasIndex(x => x.InstagramAccountId);
+            entity.HasIndex(x => x.AutomationId);
+            entity.HasIndex(x => x.CommenterIgId);
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(80);
             entity.Property(x => x.Payload).HasColumnType("jsonb");
             entity.Property(x => x.FailureReason).HasMaxLength(2000);
+            entity.Property(x => x.CommentId).HasMaxLength(100);
+            entity.Property(x => x.CommentText).HasMaxLength(2200);
+            entity.Property(x => x.CommenterIgId).HasMaxLength(100);
+            entity.Property(x => x.CommenterUsername).HasMaxLength(160);
+            entity.Property(x => x.MediaIgId).HasMaxLength(100);
+            entity.HasOne(x => x.InstagramAccount).WithMany().HasForeignKey(x => x.InstagramAccountId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(x => x.Automation).WithMany().HasForeignKey(x => x.AutomationId).OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<AuditLog>(entity =>

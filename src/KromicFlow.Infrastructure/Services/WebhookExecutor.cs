@@ -38,6 +38,13 @@ public sealed class WebhookExecutor(
                 parsed.FromId, parsed.FromUsername, parsed.FromSelfIgScopedId ?? "none",
                 parsed.CommentText);
 
+            // Populate comment metadata for analytics/conversations
+            webhookEvent.CommentId = parsed.CommentId;
+            webhookEvent.CommentText = parsed.CommentText;
+            webhookEvent.CommenterIgId = parsed.FromId;
+            webhookEvent.CommenterUsername = parsed.FromUsername;
+            webhookEvent.MediaIgId = parsed.MediaId;
+
             var account = await db.InstagramAccounts
                 .FirstOrDefaultAsync(x => x.InstagramUserId == parsed.AccountIgId, cancellationToken);
 
@@ -106,6 +113,9 @@ public sealed class WebhookExecutor(
                 }
 
                 logger.LogInformation("Automation {AutomationId} matched — firing actions", automation.Id);
+
+                // Record which automation fired this event
+                webhookEvent.AutomationId = automation.Id;
 
                 // Public reply — only if the flag is enabled and not already sent
                 if (automation.SendPublicReply && !string.IsNullOrWhiteSpace(automation.PublicReply))

@@ -72,7 +72,8 @@ internal sealed class PersistMetaWebhookCommandHandler(
         {
             EventId = request.EventId,
             Payload = request.Payload,
-            Status = WebhookStatus.Pending
+            Status = WebhookStatus.Pending,
+            InstagramAccountId = account.Id  // set now so analytics work even if executor crashes
         };
         db.WebhookEvents.Add(webhookEvent);
         await db.SaveChangesAsync(cancellationToken);
