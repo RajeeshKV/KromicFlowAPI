@@ -10,7 +10,7 @@ public sealed record UpdateAutomationCommand(
     Guid Id,
     string Name,
     AutomationScope Scope,
-    string TriggerType,
+    AutomationTriggerType TriggerType,
     string[] Keywords,
     string? PublicReply,
     string? PrivateReply,

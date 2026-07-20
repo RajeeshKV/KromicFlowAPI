@@ -28,7 +28,7 @@ internal static class AutomationMapping
             automation.InstagramAccountId,
             automation.Name,
             automation.Scope,
-            automation.TriggerType.ToString(),
+            automation.TriggerType,
             JsonSerializer.Deserialize<string[]>(automation.KeywordsJson) ?? [],
             automation.PublicReply,
             automation.PrivateReply,
@@ -38,11 +38,11 @@ internal static class AutomationMapping
             selectedMedia);
     }
 
-    public static void Apply(Automation automation, string name, AutomationScope scope, string triggerType, string[] keywords, string? publicReply, string? privateReply, int cooldownSeconds, int priority)
+    public static void Apply(Automation automation, string name, AutomationScope scope, AutomationTriggerType triggerType, string[] keywords, string? publicReply, string? privateReply, int cooldownSeconds, int priority)
     {
         automation.Name = name.Trim();
         automation.Scope = scope;
-        automation.TriggerType = Enum.TryParse<AutomationTriggerType>(triggerType, true, out var parsed) ? parsed : AutomationTriggerType.CommentKeyword;
+        automation.TriggerType = triggerType;
         automation.KeywordsJson = JsonSerializer.Serialize(keywords.Select(x => x.Trim()).Where(x => x.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase));
         automation.PublicReply = publicReply;
         automation.PrivateReply = privateReply;

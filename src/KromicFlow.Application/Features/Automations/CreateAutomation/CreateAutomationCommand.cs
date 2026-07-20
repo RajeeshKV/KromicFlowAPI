@@ -10,7 +10,7 @@ public sealed record CreateAutomationCommand(
     Guid InstagramAccountId,
     string Name,
     AutomationScope Scope,
-    string TriggerType,
+    AutomationTriggerType TriggerType,
     string[] Keywords,
     string? PublicReply,
     string? PrivateReply,
