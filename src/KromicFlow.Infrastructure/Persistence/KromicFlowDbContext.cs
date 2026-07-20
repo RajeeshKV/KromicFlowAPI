@@ -164,8 +164,7 @@ public sealed class KromicFlowDbContext(DbContextOptions<KromicFlowDbContext> op
             entity.Property(x => x.TokenStatus).HasMaxLength(20).HasDefaultValue("active");
             entity.Property(x => x.Version).IsRowVersion();
             
-            entity.HasOne(x => x.User).WithMany(x => x.InstagramAccounts).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
-        });
+            entity.HasOne(x => x.User).WithMany(x => x.InstagramAccounts).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);        });
 
         modelBuilder.Entity<Automation>(entity =>
         {
@@ -175,6 +174,9 @@ public sealed class KromicFlowDbContext(DbContextOptions<KromicFlowDbContext> op
             entity.Property(x => x.TriggerType).HasConversion<string>().HasMaxLength(80);
             entity.Property(x => x.Scope).HasConversion<string>().HasMaxLength(80);
             entity.Property(x => x.Name).HasMaxLength(160);
+            // Default true so existing rows retain their current behaviour after migration
+            entity.Property(x => x.SendPublicReply).HasDefaultValue(true);
+            entity.Property(x => x.SendPrivateReply).HasDefaultValue(true);
             entity.Property(x => x.KeywordsJson).HasColumnType("jsonb");
             entity.Property(x => x.PublicReply).HasMaxLength(2000);
             entity.Property(x => x.PrivateReply).HasMaxLength(2000);

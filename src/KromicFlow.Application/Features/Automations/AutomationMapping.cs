@@ -33,13 +33,15 @@ internal static class AutomationMapping
             JsonSerializer.Deserialize<string[]>(automation.KeywordsJson) ?? [],
             automation.PublicReply,
             automation.PrivateReply,
+            automation.SendPublicReply,
+            automation.SendPrivateReply,
             automation.Enabled,
             automation.CooldownSeconds,
             automation.Priority,
             selectedMedia);
     }
 
-    public static void Apply(Automation automation, string name, AutomationScope scope, AutomationTriggerType triggerType, string[] keywords, string? publicReply, string? privateReply, int cooldownSeconds, int priority)
+    public static void Apply(Automation automation, string name, AutomationScope scope, AutomationTriggerType triggerType, string[] keywords, string? publicReply, string? privateReply, bool sendPublicReply, bool sendPrivateReply, int cooldownSeconds, int priority)
     {
         automation.Name = name.Trim();
         automation.Scope = scope;
@@ -47,6 +49,8 @@ internal static class AutomationMapping
         automation.KeywordsJson = JsonSerializer.Serialize(keywords.Select(x => x.Trim()).Where(x => x.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase));
         automation.PublicReply = publicReply;
         automation.PrivateReply = privateReply;
+        automation.SendPublicReply = sendPublicReply;
+        automation.SendPrivateReply = sendPrivateReply;
         automation.CooldownSeconds = cooldownSeconds;
         automation.Priority = priority;
     }

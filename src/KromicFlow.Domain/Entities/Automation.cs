@@ -12,6 +12,8 @@ public sealed class Automation : Entity
     public string KeywordsJson { get; set; } = "[]";
     public string? PublicReply { get; set; }
     public string? PrivateReply { get; set; }
+    public bool SendPublicReply { get; set; } = false;   // whether to post a public comment reply
+    public bool SendPrivateReply { get; set; } = false;  // whether to send a private DM
     public bool Enabled { get; set; } = true;
     public int CooldownSeconds { get; set; }
     public int Priority { get; set; }

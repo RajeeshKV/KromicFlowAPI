@@ -10,6 +10,8 @@ public sealed record AutomationRequest(
     string[] Keywords,
     string? PublicReply,
     string? PrivateReply,
+    bool SendPublicReply,
+    bool SendPrivateReply,
     int CooldownSeconds,
     int Priority,
     List<Guid> SelectedMediaIds

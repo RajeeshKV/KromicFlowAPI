@@ -107,8 +107,8 @@ public sealed class WebhookExecutor(
 
                 logger.LogInformation("Automation {AutomationId} matched — firing actions", automation.Id);
 
-                // Public reply — skip if already sent on a previous attempt
-                if (!string.IsNullOrWhiteSpace(automation.PublicReply))
+                // Public reply — only if the flag is enabled and not already sent
+                if (automation.SendPublicReply && !string.IsNullOrWhiteSpace(automation.PublicReply))
                 {
                     if (webhookEvent.PublicReplySentUtc.HasValue)
                     {
@@ -123,9 +123,8 @@ public sealed class WebhookExecutor(
                     }
                 }
 
-                // Private reply — skip if already sent.
-                // Uses /{comment-id}/private_replies — works without a prior conversation window.
-                if (!string.IsNullOrWhiteSpace(automation.PrivateReply))
+                // Private reply — only if the flag is enabled and not already sent
+                if (automation.SendPrivateReply && !string.IsNullOrWhiteSpace(automation.PrivateReply))
                 {
                     if (webhookEvent.PrivateReplySentUtc.HasValue)
                     {

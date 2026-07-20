@@ -23,7 +23,7 @@ internal sealed class CreateAutomationCommandHandler(IKromicFlowDbContext db, IA
         if (!scopeValid) return Result<AutomationDto>.Failure("Invalid automation scope configuration.");
 
         var automation = new Automation { InstagramAccountId = request.InstagramAccountId };
-        AutomationMapping.Apply(automation, request.Name, request.Scope, request.TriggerType, request.Keywords, request.PublicReply, request.PrivateReply, request.CooldownSeconds, request.Priority);
+        AutomationMapping.Apply(automation, request.Name, request.Scope, request.TriggerType, request.Keywords, request.PublicReply, request.PrivateReply, request.SendPublicReply, request.SendPrivateReply, request.CooldownSeconds, request.Priority);
         db.Automations.Add(automation);
         await db.SaveChangesAsync(cancellationToken);
 

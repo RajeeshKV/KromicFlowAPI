@@ -11,6 +11,8 @@ public sealed record AutomationDto(
     string[] Keywords,
     string? PublicReply,
     string? PrivateReply,
+    bool SendPublicReply,
+    bool SendPrivateReply,
     bool Enabled,
     int CooldownSeconds,
     int Priority,

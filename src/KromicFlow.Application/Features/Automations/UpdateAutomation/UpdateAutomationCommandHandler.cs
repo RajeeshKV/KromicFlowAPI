@@ -19,7 +19,7 @@ internal sealed class UpdateAutomationCommandHandler(IKromicFlowDbContext db, IA
         var scopeValid = await automationScopeService.ValidateAutomationScopeAsync(request.Scope, request.Id, request.SelectedMediaIds, cancellationToken);
         if (!scopeValid) return Result<AutomationDto>.Failure("Invalid automation scope configuration.");
 
-        AutomationMapping.Apply(automation, request.Name, request.Scope, request.TriggerType, request.Keywords, request.PublicReply, request.PrivateReply, request.CooldownSeconds, request.Priority);
+        AutomationMapping.Apply(automation, request.Name, request.Scope, request.TriggerType, request.Keywords, request.PublicReply, request.PrivateReply, request.SendPublicReply, request.SendPrivateReply, request.CooldownSeconds, request.Priority);
         automation.UpdatedUtc = DateTime.UtcNow;
 
         // Update media mappings for SpecificPosts scope

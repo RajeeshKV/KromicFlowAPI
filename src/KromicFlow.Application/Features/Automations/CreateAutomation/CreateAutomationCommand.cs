@@ -14,6 +14,8 @@ public sealed record CreateAutomationCommand(
     string[] Keywords,
     string? PublicReply,
     string? PrivateReply,
+    bool SendPublicReply,
+    bool SendPrivateReply,
     int CooldownSeconds,
     int Priority,
     List<Guid> SelectedMediaIds

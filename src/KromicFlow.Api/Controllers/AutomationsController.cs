@@ -19,11 +19,11 @@ public sealed class AutomationsController(IMediator mediator) : ApiControllerBas
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] AutomationRequest request, CancellationToken cancellationToken) =>
-        FromResult(await mediator.Send(new CreateAutomationCommand(User.GetSubjectId(), request.InstagramAccountId, request.Name, request.Scope, request.TriggerType, request.Keywords, request.PublicReply, request.PrivateReply, request.CooldownSeconds, request.Priority, request.SelectedMediaIds), cancellationToken));
+        FromResult(await mediator.Send(new CreateAutomationCommand(User.GetSubjectId(), request.InstagramAccountId, request.Name, request.Scope, request.TriggerType, request.Keywords, request.PublicReply, request.PrivateReply, request.SendPublicReply, request.SendPrivateReply, request.CooldownSeconds, request.Priority, request.SelectedMediaIds), cancellationToken));
 
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] AutomationRequest request, CancellationToken cancellationToken) =>
-        FromResult(await mediator.Send(new UpdateAutomationCommand(User.GetSubjectId(), id, request.Name, request.Scope, request.TriggerType, request.Keywords, request.PublicReply, request.PrivateReply, request.CooldownSeconds, request.Priority, request.SelectedMediaIds), cancellationToken));
+        FromResult(await mediator.Send(new UpdateAutomationCommand(User.GetSubjectId(), id, request.Name, request.Scope, request.TriggerType, request.Keywords, request.PublicReply, request.PrivateReply, request.SendPublicReply, request.SendPrivateReply, request.CooldownSeconds, request.Priority, request.SelectedMediaIds), cancellationToken));
 
     [HttpPatch("{id:guid}/enable")]
     public async Task<IActionResult> Enable(Guid id, [FromBody] EnableAutomationRequest request, CancellationToken cancellationToken) =>

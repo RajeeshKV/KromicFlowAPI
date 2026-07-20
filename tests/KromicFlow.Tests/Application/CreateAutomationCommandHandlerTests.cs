@@ -25,7 +25,7 @@ public sealed class CreateAutomationCommandHandlerTests
         await db.SaveChangesAsync();
 
         var handler = new CreateAutomationCommandHandler(db, new NoopAuditWriter(), new NoopAutomationScopeService());
-        var result = await handler.Handle(new CreateAutomationCommand(user.Id, account.Id, "New", AutomationScope.SpecificPosts, "CommentKeyword", ["hi"], "hello", null, 0, 0, []), CancellationToken.None);
+        var result = await handler.Handle(new CreateAutomationCommand(user.Id, account.Id, "New", AutomationScope.SpecificPosts, AutomationTriggerType.CommentKeyword, ["hi"], "hello", null, false, false, 0, 0, []), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         Assert.Equal("Plan automation limit reached.", result.Error);
