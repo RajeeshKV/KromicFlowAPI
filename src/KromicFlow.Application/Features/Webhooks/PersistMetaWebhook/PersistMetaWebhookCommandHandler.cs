@@ -1,129 +1,90 @@
-﻿using KromicFlow.Application.Abstractions;
+﻿using System.Text.Json;
+using KromicFlow.Application.Abstractions;
 using KromicFlow.Application.Common;
-using KromicFlow.Application.Services;
 using KromicFlow.Domain.Entities;
 using KromicFlow.Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using System.Text.Json;
 
 namespace KromicFlow.Application.Features.Webhooks.PersistMetaWebhook;
 
 internal sealed class PersistMetaWebhookCommandHandler(
-    IKromicFlowDbContext db, 
-    IAutomationScopeService automationScopeService,
+    IKromicFlowDbContext db,
+    IWebhookExecutor webhookExecutor,
     ILogger<PersistMetaWebhookCommandHandler> logger) : IRequestHandler<PersistMetaWebhookCommand, Result>
 {
     public async Task<Result> Handle(PersistMetaWebhookCommand request, CancellationToken cancellationToken)
     {
         logger.LogInformation("Processing webhook event {EventId}", request.EventId);
-        
+
+        // Idempotency check — Meta retries on non-200 so duplicates are common
         if (await db.WebhookEvents.AnyAsync(x => x.EventId == request.EventId, cancellationToken))
         {
-            logger.LogInformation("Webhook event {EventId} already processed, skipping", request.EventId);
+            logger.LogInformation("Webhook event {EventId} already seen, skipping", request.EventId);
             return Result.Success();
         }
 
-        // Parse webhook payload to extract Instagram account ID and media ID
-        logger.LogInformation("Extracting IDs from webhook payload");
-        var (instagramAccountId, instagramMediaId) = ExtractWebhookIds(request.Payload);
-        logger.LogInformation("Extracted IDs - InstagramAccountId: {InstagramAccountId}, InstagramMediaId: {InstagramMediaId}", 
-            instagramAccountId ?? "null", instagramMediaId ?? "null");
-        
-        if (string.IsNullOrEmpty(instagramAccountId))
+        var parsed = ExtractWebhookIds(request.Payload);
+        logger.LogInformation("Extracted IDs — InstagramAccountId: {AccountId}, InstagramMediaId: {MediaId}",
+            parsed.InstagramAccountId ?? "null", parsed.InstagramMediaId ?? "null");
+
+        // Unknown account — persist for debugging only, do not attempt execution
+        if (string.IsNullOrEmpty(parsed.InstagramAccountId))
         {
-            logger.LogWarning("Cannot determine Instagram account ID from webhook payload");
-            // Cannot determine account, but still persist for debugging
-            db.WebhookEvents.Add(new WebhookEvent { EventId = request.EventId, Payload = request.Payload });
-            await db.SaveChangesAsync(cancellationToken);
-            logger.LogInformation("Webhook persisted without account ID for debugging");
-            return Result.Success();
-        }
-
-        // Look up Instagram account and check connection state
-        logger.LogInformation("Looking up Instagram account {InstagramAccountId}", instagramAccountId);
-        var instagramAccount = await db.InstagramAccounts
-            .FirstOrDefaultAsync(x => x.InstagramUserId == instagramAccountId, cancellationToken);
-
-        if (instagramAccount == null)
-        {
-            logger.LogWarning("Instagram account {InstagramAccountId} not found in system, ignoring webhook", instagramAccountId);
-            // Account not found in our system, ignore webhook
-            return Result.Success();
-        }
-
-        logger.LogInformation("Found Instagram account {AccountId} (IsConnected: {IsConnected})", instagramAccount.Id, instagramAccount.IsConnected);
-
-        // Only process webhooks for connected accounts
-        if (!instagramAccount.IsConnected)
-        {
-            logger.LogWarning("Instagram account {AccountId} is disconnected, ignoring webhook", instagramAccount.Id);
-            // Account is disconnected, ignore webhook but still persist for audit
-            db.WebhookEvents.Add(new WebhookEvent { EventId = request.EventId, Payload = request.Payload });
-            await db.SaveChangesAsync(cancellationToken);
-            logger.LogInformation("Webhook persisted for disconnected account");
-            return Result.Success();
-        }
-
-        // If media ID is present, validate automation scope
-        if (!string.IsNullOrEmpty(instagramMediaId))
-        {
-            logger.LogInformation("Media ID {InstagramMediaId} present, validating automation scope", instagramMediaId);
-            
-            // Get all enabled automations for this account
-            var automations = await db.Automations
-                .Where(x => x.InstagramAccountId == instagramAccount.Id && x.Enabled)
-                .Select(x => x.Id)
-                .ToListAsync(cancellationToken);
-
-            logger.LogInformation("Found {Count} enabled automations for account {AccountId}", automations.Count, instagramAccount.Id);
-
-            // Check if any automation is applicable for this media
-            bool hasApplicableAutomation = false;
-            foreach (var automationId in automations)
+            logger.LogWarning("Cannot determine Instagram account from payload, persisting for debug");
+            db.WebhookEvents.Add(new WebhookEvent
             {
-                var isApplicable = await automationScopeService.IsAutomationApplicableAsync(automationId, instagramMediaId, cancellationToken);
-                logger.LogInformation("Automation {AutomationId} applicable for media {MediaId}: {IsApplicable}", automationId, instagramMediaId, isApplicable);
-                
-                if (isApplicable)
-                {
-                    hasApplicableAutomation = true;
-                    break;
-                }
-            }
-
-            // If no automation is applicable, still persist for audit but mark as skipped
-            if (!hasApplicableAutomation)
-            {
-                logger.LogWarning("No applicable automation found for media {MediaId}, marking webhook as skipped", instagramMediaId);
-                db.WebhookEvents.Add(new WebhookEvent 
-                { 
-                    EventId = request.EventId, 
-                    Payload = request.Payload,
-                    Status = WebhookStatus.Skipped,
-                    FailureReason = "No applicable automation for media scope"
-                });
-                await db.SaveChangesAsync(cancellationToken);
-                logger.LogInformation("Webhook persisted with Skipped status");
-                return Result.Success();
-            }
-            
-            logger.LogInformation("Found applicable automation for media {MediaId}", instagramMediaId);
+                EventId = request.EventId,
+                Payload = request.Payload,
+                Status = WebhookStatus.Skipped,
+                FailureReason = "Could not extract InstagramAccountId from payload"
+            });
+            await db.SaveChangesAsync(cancellationToken);
+            return Result.Success();
         }
-        else
+
+        var account = await db.InstagramAccounts
+            .FirstOrDefaultAsync(x => x.InstagramUserId == parsed.InstagramAccountId, cancellationToken);
+
+        if (account is null)
         {
-            logger.LogInformation("No media ID in webhook, skipping scope validation");
+            logger.LogWarning("Instagram account {AccountId} not in system, ignoring", parsed.InstagramAccountId);
+            return Result.Success();
         }
 
-        // Account is connected and automation is applicable, persist webhook for processing
-        logger.LogInformation("Persisting webhook for processing - Account: {AccountId}, Media: {MediaId}", 
-            instagramAccount.Id, instagramMediaId ?? "none");
-        
-        db.WebhookEvents.Add(new WebhookEvent { EventId = request.EventId, Payload = request.Payload });
+        if (!account.IsConnected)
+        {
+            logger.LogWarning("Instagram account {AccountId} is disconnected, persisting for audit", account.Id);
+            db.WebhookEvents.Add(new WebhookEvent
+            {
+                EventId = request.EventId,
+                Payload = request.Payload,
+                Status = WebhookStatus.Skipped,
+                FailureReason = "Account is disconnected"
+            });
+            await db.SaveChangesAsync(cancellationToken);
+            return Result.Success();
+        }
+
+        // Persist as Pending first so we have a durable record even if execution crashes
+        var webhookEvent = new WebhookEvent
+        {
+            EventId = request.EventId,
+            Payload = request.Payload,
+            Status = WebhookStatus.Pending
+        };
+        db.WebhookEvents.Add(webhookEvent);
         await db.SaveChangesAsync(cancellationToken);
-        
-        logger.LogInformation("Webhook persisted successfully for event {EventId}", request.EventId);
+
+        logger.LogInformation("Webhook event {EventId} saved, executing immediately", request.EventId);
+
+        // Execute inline — zero delay on the happy path.
+        // If this throws, the event stays Pending and the retry sweeper picks it up.
+        await webhookExecutor.ExecuteAsync(webhookEvent, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+
+        logger.LogInformation("Webhook event {EventId} finished with status {Status}", request.EventId, webhookEvent.Status);
         return Result.Success();
     }
 
@@ -137,42 +98,31 @@ internal sealed class PersistMetaWebhookCommandHandler(
             string? instagramAccountId = null;
             string? instagramMediaId = null;
 
-            // Try to extract IDs from various webhook formats
-            // Format 1: comments webhook
             if (root.TryGetProperty("entry", out var entries) && entries.GetArrayLength() > 0)
             {
                 var entry = entries[0];
-                
-                // Extract Instagram account ID from entry level (account that owns the media)
+
                 if (entry.TryGetProperty("id", out var entryId))
-                {
                     instagramAccountId = entryId.GetString();
-                }
-                
+
                 if (entry.TryGetProperty("changes", out var changes) && changes.GetArrayLength() > 0)
                 {
-                    var change = changes[0];
-                    if (change.TryGetProperty("value", out var value))
+                    var value = changes[0].TryGetProperty("value", out var v) ? v : default;
+
+                    if (value.ValueKind == System.Text.Json.JsonValueKind.Object)
                     {
-                        // Extract media ID
-                        if (value.TryGetProperty("media", out var media))
-                        {
-                            if (media.TryGetProperty("id", out var mediaId))
-                            {
-                                instagramMediaId = mediaId.GetString();
-                            }
-                        }
-                        if (value.TryGetProperty("media_id", out var mediaId2))
-                        {
-                            instagramMediaId = mediaId2.GetString();
-                        }
+                        if (value.TryGetProperty("media", out var media) && media.TryGetProperty("id", out var mid))
+                            instagramMediaId = mid.GetString();
+
+                        if (instagramMediaId is null && value.TryGetProperty("media_id", out var mid2))
+                            instagramMediaId = mid2.GetString();
                     }
                 }
             }
 
             return (instagramAccountId, instagramMediaId);
         }
-        catch (Exception ex)
+        catch
         {
             return (null, null);
         }

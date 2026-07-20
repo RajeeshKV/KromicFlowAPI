@@ -361,8 +361,66 @@ public sealed class MetaApiClient(
         logger.LogInformation("Webhook subscription successful: {Content}", content);
     }
 
-    private record MetaTokenResponse(string? AccessToken, string? TokenType, long? ExpiresIn);
-    private record MetaUser(string UserId, string Username);
+    public async Task PostCommentReplyAsync(string accessToken, string commentId, string message, CancellationToken cancellationToken)
+    {
+        logger.LogInformation("Posting public reply to comment {CommentId}", commentId);
+
+        var url = $"{options.Value.GraphApiBaseUrl}/{commentId}/replies";
+        var body = new Dictionary<string, string>
+        {
+            ["message"] = message,
+            ["access_token"] = accessToken
+        };
+
+        var response = await RetryAsync(
+            () => httpClient.PostAsync(url, new FormUrlEncodedContent(body), cancellationToken),
+            cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+            logger.LogError("Failed to post comment reply: {StatusCode} - {Content}", response.StatusCode, errorContent);
+            throw new MetaApiException($"Failed to post comment reply: {response.StatusCode} - {errorContent}");
+        }
+
+        logger.LogInformation("Successfully posted public reply to comment {CommentId}", commentId);
+    }
+
+    public async Task SendDirectMessageAsync(string accessToken, string instagramUserId, string recipientIgsid, string message, CancellationToken cancellationToken)
+    {
+        logger.LogInformation("Sending DM from account {InstagramUserId} to recipient {RecipientIgsid}", instagramUserId, recipientIgsid);
+
+        var url = $"{options.Value.GraphApiBaseUrl}/{instagramUserId}/messages";
+        var payload = new
+        {
+            recipient = new { id = recipientIgsid },
+            message = new { text = message }
+        };
+
+        var json = JsonSerializer.Serialize(payload, _jsonOptions);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        // access_token must go in the query string for the messages endpoint
+        var fullUrl = QueryHelpers.AddQueryString(url, new Dictionary<string, string>
+        {
+            ["access_token"] = accessToken
+        });
+
+        var response = await RetryAsync(
+            () => httpClient.PostAsync(fullUrl, content, cancellationToken),
+            cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+            logger.LogError("Failed to send DM to {RecipientIgsid}: {StatusCode} - {Content}", recipientIgsid, response.StatusCode, errorContent);
+            throw new MetaApiException($"Failed to send DM: {response.StatusCode} - {errorContent}");
+        }
+
+        logger.LogInformation("Successfully sent DM to recipient {RecipientIgsid}", recipientIgsid);
+    }
+
+    private record MetaTokenResponse(string? AccessToken, string? TokenType, long? ExpiresIn);    private record MetaUser(string UserId, string Username);
     private record MetaInstagramBusinessAccountResponse(string Id, string? UserId, string Username, string? ProfilePictureUrl, string? AccountType);
     private record MetaInstagramProfileResponse(string Username, string ProfilePictureUrl);
     private record MetaMediaItem(string Id, string MediaType, string? Caption, string? ThumbnailUrl, string? MediaUrl, string? Permalink, string Timestamp, int? LikeCount, int? CommentsCount);

@@ -45,6 +45,7 @@ public static class DependencyInjection
         services.AddScoped<IOutboxEventPublisher, OutboxEventPublisher>();
         services.AddScoped<IAutomationEligibilityService, AutomationEligibilityService>();
         services.AddScoped<IAutomationScopeService, AutomationScopeService>();
+        services.AddScoped<IWebhookExecutor, WebhookExecutor>();
         services.AddHttpClient<IMetaApiClient, MetaApiClient>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(30);
@@ -56,6 +57,7 @@ public static class DependencyInjection
         });
         services.AddHostedService<TokenRefreshBackgroundService>();
         services.AddHostedService<OutboxEventBackgroundService>();
+        services.AddHostedService<WebhookProcessorBackgroundService>();
         return services;
     }
 }
