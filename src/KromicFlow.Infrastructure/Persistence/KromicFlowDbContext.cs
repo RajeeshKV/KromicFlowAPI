@@ -190,9 +190,9 @@ public sealed class KromicFlowDbContext(DbContextOptions<KromicFlowDbContext> op
             entity.HasIndex(x => x.MediaType);
             entity.Property(x => x.MediaType).HasConversion<string>().HasMaxLength(80);
             entity.Property(x => x.Caption).HasMaxLength(2200);
-            entity.Property(x => x.ThumbnailUrl).HasMaxLength(1000);
-            entity.Property(x => x.MediaUrl).HasMaxLength(1000);
-            entity.Property(x => x.Permalink).HasMaxLength(1000);
+            entity.Property(x => x.ThumbnailUrl).HasColumnType("text");
+            entity.Property(x => x.MediaUrl).HasColumnType("text");
+            entity.Property(x => x.Permalink).HasColumnType("text");
             entity.HasOne(x => x.InstagramAccount).WithMany().HasForeignKey(x => x.InstagramAccountId).OnDelete(DeleteBehavior.Cascade);
         });
 
