@@ -17,29 +17,30 @@ internal sealed class GetConversationsQueryHandler(IKromicFlowDbContext db)
         if (account is null)
             return new PagedResult<ConversationDto>([], request.Page, request.PageSize, 0);
 
-        // Only events that have a commenter (i.e. parsed comment payloads)
         var baseQuery = db.WebhookEvents
             .Where(x => x.InstagramAccountId == request.InstagramAccountId
                      && x.CommenterIgId != null
                      && x.Status != WebhookStatus.Skipped);
 
-        // Count distinct commenters for pagination
+        // Optional filter: only conversations on a specific post
+        if (!string.IsNullOrEmpty(request.MediaIgId))
+            baseQuery = baseQuery.Where(x => x.MediaIgId == request.MediaIgId);
+
         var totalDistinct = await baseQuery
             .Select(x => x.CommenterIgId)
             .Distinct()
             .CountAsync(cancellationToken);
 
-        // Get the latest event per commenter, ordered by most recent first
-        // Use a subquery: for each commenter get max ReceivedUtc then join back
+        // Get latest event ID per commenter for pagination
         var latestPerCommenter = await baseQuery
             .GroupBy(x => x.CommenterIgId!)
             .Select(g => new
             {
-                CommenterIgId = g.Key,
-                LatestId = g.OrderByDescending(x => x.ReceivedUtc).First().Id,
+                CommenterIgId     = g.Key,
+                LatestId          = g.OrderByDescending(x => x.ReceivedUtc).First().Id,
                 TotalInteractions = g.Count()
             })
-            .OrderByDescending(x => x.LatestId)  // proxy for most-recent sort
+            .OrderByDescending(x => x.LatestId)
             .Skip((request.Page - 1) * request.PageSize)
             .Take(request.PageSize)
             .ToListAsync(cancellationToken);
@@ -47,8 +48,8 @@ internal sealed class GetConversationsQueryHandler(IKromicFlowDbContext db)
         if (latestPerCommenter.Count == 0)
             return new PagedResult<ConversationDto>([], request.Page, request.PageSize, totalDistinct);
 
-        var latestEventIds = latestPerCommenter.Select(x => x.LatestId).ToList();
-        var interactionMap = latestPerCommenter.ToDictionary(x => x.CommenterIgId, x => x.TotalInteractions);
+        var latestEventIds  = latestPerCommenter.Select(x => x.LatestId).ToList();
+        var interactionMap  = latestPerCommenter.ToDictionary(x => x.CommenterIgId, x => x.TotalInteractions);
 
         var events = await db.WebhookEvents
             .Where(x => latestEventIds.Contains(x.Id))
@@ -57,15 +58,15 @@ internal sealed class GetConversationsQueryHandler(IKromicFlowDbContext db)
         var conversations = events
             .OrderByDescending(x => x.ReceivedUtc)
             .Select(e => new ConversationDto(
-                CommenterIgId: e.CommenterIgId!,
-                CommenterUsername: e.CommenterUsername ?? e.CommenterIgId!,
-                LatestCommentText: e.CommentText ?? string.Empty,
-                MediaIgId: e.MediaIgId,
-                ReceivedUtc: e.ReceivedUtc,
-                Status: e.Status,
-                PublicReplySent: e.PublicReplySentUtc.HasValue,
-                PrivateReplySent: e.PrivateReplySentUtc.HasValue,
-                TotalInteractions: interactionMap.GetValueOrDefault(e.CommenterIgId!, 1)
+                CommenterIgId:      e.CommenterIgId!,
+                CommenterUsername:  e.CommenterUsername ?? e.CommenterIgId!,
+                LatestCommentText:  e.CommentText ?? string.Empty,
+                MediaIgId:          e.MediaIgId,
+                ReceivedUtc:        e.ReceivedUtc,
+                Status:             e.Status,
+                PublicReplySent:    e.PublicReplySentUtc.HasValue,
+                PrivateReplySent:   e.PrivateReplySentUtc.HasValue,
+                TotalInteractions:  interactionMap.GetValueOrDefault(e.CommenterIgId!, 1)
             ))
             .ToList();
 

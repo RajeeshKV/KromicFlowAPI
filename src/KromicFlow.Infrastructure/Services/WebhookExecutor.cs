@@ -1,5 +1,6 @@
 using System.Text.Json;
 using KromicFlow.Application.Abstractions;
+using KromicFlow.Application.Services;
 using KromicFlow.Domain.Entities;
 using KromicFlow.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -11,6 +12,7 @@ public sealed class WebhookExecutor(
     IKromicFlowDbContext db,
     IMetaApiClient metaClient,
     IDataProtectionService dataProtection,
+    IPlanEnforcementService planEnforcement,
     ILogger<WebhookExecutor> logger) : IWebhookExecutor
 {
     private static readonly int MaxRetries = 3;
@@ -116,6 +118,50 @@ public sealed class WebhookExecutor(
 
                 // Record which automation fired this event
                 webhookEvent.AutomationId = automation.Id;
+
+                // Cooldown check — skip if this commenter triggered this automation too recently
+                if (automation.CooldownSeconds > 0)
+                {
+                    var cooldownCutoff = DateTime.UtcNow.AddSeconds(-automation.CooldownSeconds);
+                    var recentFire = await db.WebhookEvents
+                        .AnyAsync(x =>
+                            x.AutomationId == automation.Id &&
+                            x.CommenterIgId == parsed.FromId &&
+                            x.Status == WebhookStatus.Completed &&
+                            x.ProcessedUtc.HasValue && x.ProcessedUtc.Value > cooldownCutoff,
+                            cancellationToken);
+
+                    if (recentFire)
+                    {
+                        logger.LogInformation(
+                            "Commenter {CommenterIgId} is within cooldown period ({CooldownSeconds}s) for automation {AutomationId}, skipping",
+                            parsed.FromId, automation.CooldownSeconds, automation.Id);
+                        webhookEvent.Status = WebhookStatus.Skipped;
+                        webhookEvent.FailureReason = $"Cooldown active ({automation.CooldownSeconds}s)";
+                        webhookEvent.ProcessedUtc = DateTime.UtcNow;
+                        return;
+                    }
+                }
+
+                // Monthly run limit check (plan enforcement — configurable kill switch)
+                var monthStart = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+                var monthlyRuns = await db.WebhookEvents
+                    .CountAsync(x =>
+                        x.InstagramAccountId == account.Id &&
+                        x.Status == WebhookStatus.Completed &&
+                        x.ReceivedUtc >= monthStart,
+                        cancellationToken);
+
+                if (!await planEnforcement.IsWithinMonthlyRunLimitAsync(account.UserId, monthlyRuns, cancellationToken))
+                {
+                    logger.LogWarning(
+                        "Account {AccountId} has reached monthly run limit ({Runs} runs), skipping event {EventId}",
+                        account.Id, monthlyRuns, webhookEvent.EventId);
+                    webhookEvent.Status = WebhookStatus.Skipped;
+                    webhookEvent.FailureReason = "Monthly automation run limit reached";
+                    webhookEvent.ProcessedUtc = DateTime.UtcNow;
+                    return;
+                }
 
                 // Public reply — only if the flag is enabled and not already sent
                 if (automation.SendPublicReply && !string.IsNullOrWhiteSpace(automation.PublicReply))

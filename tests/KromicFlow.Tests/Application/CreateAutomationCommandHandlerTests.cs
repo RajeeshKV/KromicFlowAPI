@@ -24,7 +24,7 @@ public sealed class CreateAutomationCommandHandlerTests
         db.Automations.Add(new Automation { InstagramAccount = account, Name = "Existing" });
         await db.SaveChangesAsync();
 
-        var handler = new CreateAutomationCommandHandler(db, new NoopAuditWriter(), new NoopAutomationScopeService());
+        var handler = new CreateAutomationCommandHandler(db, new NoopAuditWriter(), new NoopAutomationScopeService(), new EnforcingPlanEnforcementService(1));
         var result = await handler.Handle(new CreateAutomationCommand(user.Id, account.Id, "New", AutomationScope.SpecificPosts, AutomationTriggerType.CommentKeyword, ["hi"], "hello", null, false, false, 0, 0, []), CancellationToken.None);
 
         Assert.False(result.Succeeded);
@@ -40,5 +40,15 @@ public sealed class CreateAutomationCommandHandlerTests
     {
         public Task<bool> IsAutomationApplicableAsync(Guid automationId, string instagramMediaId, CancellationToken cancellationToken) => Task.FromResult(true);
         public Task<bool> ValidateAutomationScopeAsync(AutomationScope scope, Guid automationId, List<Guid> selectedMediaIds, CancellationToken cancellationToken) => Task.FromResult(true);
+    }
+
+    // Enforcement stub that always enforces a fixed max limit
+    private sealed class EnforcingPlanEnforcementService(int maxAutomations) : IPlanEnforcementService
+    {
+        public Task<bool> IsEnforcementEnabledAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
+        public Task<int> GetMaxAutomationsAsync(Guid userId, CancellationToken cancellationToken = default) => Task.FromResult(maxAutomations);
+        public Task<int> GetMaxInstagramAccountsAsync(Guid userId, CancellationToken cancellationToken = default) => Task.FromResult(int.MaxValue);
+        public Task<int> GetMonthlyAutomationRunsAsync(Guid userId, CancellationToken cancellationToken = default) => Task.FromResult(int.MaxValue);
+        public Task<bool> IsWithinMonthlyRunLimitAsync(Guid userId, int currentMonthRuns, CancellationToken cancellationToken = default) => Task.FromResult(true);
     }
 }

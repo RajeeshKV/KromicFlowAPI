@@ -118,22 +118,61 @@ public sealed class KromicFlowDbContext(DbContextOptions<KromicFlowDbContext> op
             entity.HasIndex(x => x.Code).IsUnique();
             entity.Property(x => x.Code).HasMaxLength(80);
             entity.Property(x => x.Name).HasMaxLength(160);
+            entity.Property(x => x.BillingPeriod).HasMaxLength(20).HasDefaultValue("monthly");
             entity.Property(x => x.ConfigurationJson).HasColumnType("jsonb");
-            entity.HasData(new Plan
-            {
-                Id = Guid.Parse("10000000-0000-0000-0000-000000000001"),
-                Code = "free",
-                Name = "Free",
-                IsActive = true,
-                IsDefault = true,
-                MaxInstagramAccounts = 1,
-                MaxAutomations = 3,
-                MonthlyAutomationRuns = 100,
-                MonthlyEmails = 25,
-                MonthlyPushNotifications = 25,
-                ConfigurationJson = "{}",
-                CreatedUtc = new DateTime(2026, 7, 18, 0, 0, 0, DateTimeKind.Utc)
-            });
+            entity.HasData(
+                new Plan
+                {
+                    Id = Guid.Parse("10000000-0000-0000-0000-000000000001"),
+                    Code = "free",
+                    Name = "Free",
+                    IsActive = true,
+                    IsDefault = true,
+                    MaxInstagramAccounts = 1,
+                    MaxAutomations = 3,
+                    MonthlyAutomationRuns = 500,
+                    MonthlyEmails = 25,
+                    MonthlyPushNotifications = 25,
+                    PriceInrPaise = 0,
+                    BillingPeriod = "monthly",
+                    ConfigurationJson = "{}",
+                    CreatedUtc = new DateTime(2026, 7, 18, 0, 0, 0, DateTimeKind.Utc)
+                },
+                new Plan
+                {
+                    Id = Guid.Parse("10000000-0000-0000-0000-000000000002"),
+                    Code = "starter",
+                    Name = "Starter",
+                    IsActive = true,
+                    IsDefault = false,
+                    MaxInstagramAccounts = 2,
+                    MaxAutomations = 10,
+                    MonthlyAutomationRuns = 2000,
+                    MonthlyEmails = 100,
+                    MonthlyPushNotifications = 100,
+                    PriceInrPaise = 9900,   // ₹99/month
+                    BillingPeriod = "monthly",
+                    ConfigurationJson = "{}",
+                    CreatedUtc = new DateTime(2026, 7, 18, 0, 0, 0, DateTimeKind.Utc)
+                },
+                new Plan
+                {
+                    Id = Guid.Parse("10000000-0000-0000-0000-000000000003"),
+                    Code = "pro",
+                    Name = "Pro",
+                    IsActive = true,
+                    IsDefault = false,
+                    MaxInstagramAccounts = 5,
+                    MaxAutomations = 50,
+                    MonthlyAutomationRuns = 10000,
+                    MonthlyEmails = 500,
+                    MonthlyPushNotifications = 500,
+                    PriceInrPaise = 29900,  // ₹299/month
+                    BillingPeriod = "monthly",
+                    ConfigurationJson = "{}",
+                    CreatedUtc = new DateTime(2026, 7, 18, 0, 0, 0, DateTimeKind.Utc)
+                }
+            );
         });
 
         modelBuilder.Entity<RuntimeSetting>(entity =>
@@ -218,6 +257,8 @@ public sealed class KromicFlowDbContext(DbContextOptions<KromicFlowDbContext> op
             entity.HasIndex(x => x.InstagramAccountId);
             entity.HasIndex(x => x.AutomationId);
             entity.HasIndex(x => x.CommenterIgId);
+            entity.HasIndex(x => new { x.InstagramAccountId, x.CommenterIgId }); // conversations query
+            entity.HasIndex(x => x.CommentId);                                    // dedup lookup
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(80);
             entity.Property(x => x.Payload).HasColumnType("jsonb");
             entity.Property(x => x.FailureReason).HasMaxLength(2000);

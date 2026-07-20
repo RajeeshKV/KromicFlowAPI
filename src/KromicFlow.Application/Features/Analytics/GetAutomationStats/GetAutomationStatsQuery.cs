@@ -2,7 +2,12 @@ using MediatR;
 
 namespace KromicFlow.Application.Features.Analytics.GetAutomationStats;
 
-public sealed record GetAutomationStatsQuery(Guid UserId, Guid InstagramAccountId) : IRequest<List<AutomationStatsDto>>;
+public sealed record GetAutomationStatsQuery(
+    Guid UserId,
+    Guid InstagramAccountId,
+    DateTime? From = null,
+    DateTime? To = null
+) : IRequest<List<AutomationStatsDto>>;
 
 public sealed record AutomationStatsDto(
     Guid AutomationId,

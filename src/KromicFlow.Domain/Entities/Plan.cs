@@ -12,4 +12,9 @@ public sealed class Plan : Entity
     public int MonthlyEmails { get; set; } = 25;
     public int MonthlyPushNotifications { get; set; } = 25;
     public string ConfigurationJson { get; set; } = "{}";
+
+    // Pricing — stored in INR paise (100 paise = ₹1) to avoid decimals
+    // 0 = free plan
+    public int PriceInrPaise { get; set; } = 0;
+    public string BillingPeriod { get; set; } = "monthly"; // monthly, yearly, lifetime
 }

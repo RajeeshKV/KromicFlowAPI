@@ -7,6 +7,7 @@ namespace KromicFlow.Application.Features.Analytics.GetConversations;
 public sealed record GetConversationsQuery(
     Guid UserId,
     Guid InstagramAccountId,
+    string? MediaIgId = null,    // filter to a specific post
     int Page = 1,
     int PageSize = 25
 ) : IRequest<PagedResult<ConversationDto>>;
@@ -20,5 +21,5 @@ public sealed record ConversationDto(
     WebhookStatus Status,
     bool PublicReplySent,
     bool PrivateReplySent,
-    int TotalInteractions          // how many times this user has triggered an automation
+    int TotalInteractions
 );

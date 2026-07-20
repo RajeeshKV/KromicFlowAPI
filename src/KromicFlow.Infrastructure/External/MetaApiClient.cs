@@ -468,13 +468,25 @@ public sealed class MetaApiClient(
             try
             {
                 var response = await requestFunc();
-                
-                if (response.IsSuccessStatusCode || IsNonRetriableStatus(response.StatusCode))
+
+                // 429 Too Many Requests — respect Retry-After or use exponential backoff
+                if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
                 {
-                    return response;
+                    var retryAfter = response.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(Math.Pow(2, attempt + 2));
+                    logger.LogWarning("Meta API rate limit hit (429), backing off for {RetryAfter}s (attempt {Attempt}/{MaxRetries})",
+                        retryAfter.TotalSeconds, attempt + 1, MaxRetries);
+
+                    if (attempt < MaxRetries - 1)
+                        await Task.Delay(retryAfter, cancellationToken);
+
+                    continue;
                 }
 
-                logger.LogWarning("Meta API request failed with status {StatusCode}, attempt {Attempt}/{MaxRetries}", response.StatusCode, attempt + 1, MaxRetries);
+                if (response.IsSuccessStatusCode || IsNonRetriableStatus(response.StatusCode))
+                    return response;
+
+                logger.LogWarning("Meta API request failed with status {StatusCode}, attempt {Attempt}/{MaxRetries}",
+                    response.StatusCode, attempt + 1, MaxRetries);
             }
             catch (HttpRequestException ex)
             {
@@ -483,7 +495,7 @@ public sealed class MetaApiClient(
 
             if (attempt < MaxRetries - 1)
             {
-                var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt));
+                var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt)); // 1s, 2s, 4s, 8s...
                 await Task.Delay(delay, cancellationToken);
             }
         }

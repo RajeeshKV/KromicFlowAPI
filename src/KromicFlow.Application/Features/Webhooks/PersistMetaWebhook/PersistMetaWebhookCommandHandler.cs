@@ -18,18 +18,29 @@ internal sealed class PersistMetaWebhookCommandHandler(
     {
         logger.LogInformation("Processing webhook event {EventId}", request.EventId);
 
-        // Idempotency check — Meta retries on non-200 so duplicates are common
+        // Primary dedup on EventId (payload SHA256) — catches exact retries
         if (await db.WebhookEvents.AnyAsync(x => x.EventId == request.EventId, cancellationToken))
         {
-            logger.LogInformation("Webhook event {EventId} already seen, skipping", request.EventId);
+            logger.LogInformation("Webhook event {EventId} already seen (exact duplicate), skipping", request.EventId);
             return Result.Success();
         }
 
         var parsed = ExtractWebhookIds(request.Payload);
-        logger.LogInformation("Extracted IDs — InstagramAccountId: {AccountId}, InstagramMediaId: {MediaId}",
-            parsed.InstagramAccountId ?? "null", parsed.InstagramMediaId ?? "null");
+        logger.LogInformation("Extracted IDs — InstagramAccountId: {AccountId}, MediaId: {MediaId}, CommentId: {CommentId}",
+            parsed.InstagramAccountId ?? "null", parsed.InstagramMediaId ?? "null", parsed.CommentId ?? "null");
 
-        // Unknown account — persist for debugging only, do not attempt execution
+        // Secondary dedup on CommentId — Meta sometimes retries with a slightly different
+        // payload (different timestamp) which produces a different SHA256 but is the same comment
+        if (!string.IsNullOrEmpty(parsed.CommentId))
+        {
+            if (await db.WebhookEvents.AnyAsync(x => x.CommentId == parsed.CommentId, cancellationToken))
+            {
+                logger.LogInformation("Comment {CommentId} already processed, skipping duplicate webhook", parsed.CommentId);
+                return Result.Success();
+            }
+        }
+
+        // Unknown account — persist for debugging only
         if (string.IsNullOrEmpty(parsed.InstagramAccountId))
         {
             logger.LogWarning("Cannot determine Instagram account from payload, persisting for debug");
@@ -37,6 +48,7 @@ internal sealed class PersistMetaWebhookCommandHandler(
             {
                 EventId = request.EventId,
                 Payload = request.Payload,
+                CommentId = parsed.CommentId,
                 Status = WebhookStatus.Skipped,
                 FailureReason = "Could not extract InstagramAccountId from payload"
             });
@@ -60,28 +72,29 @@ internal sealed class PersistMetaWebhookCommandHandler(
             {
                 EventId = request.EventId,
                 Payload = request.Payload,
+                CommentId = parsed.CommentId,
                 Status = WebhookStatus.Skipped,
-                FailureReason = "Account is disconnected"
+                FailureReason = "Account is disconnected",
+                InstagramAccountId = account.Id
             });
             await db.SaveChangesAsync(cancellationToken);
             return Result.Success();
         }
 
-        // Persist as Pending first so we have a durable record even if execution crashes
+        // Persist as Pending — durable record before execution
         var webhookEvent = new WebhookEvent
         {
             EventId = request.EventId,
             Payload = request.Payload,
+            CommentId = parsed.CommentId,
             Status = WebhookStatus.Pending,
-            InstagramAccountId = account.Id  // set now so analytics work even if executor crashes
+            InstagramAccountId = account.Id
         };
         db.WebhookEvents.Add(webhookEvent);
         await db.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation("Webhook event {EventId} saved, executing immediately", request.EventId);
 
-        // Execute inline — zero delay on the happy path.
-        // If this throws, the event stays Pending and the retry sweeper picks it up.
         await webhookExecutor.ExecuteAsync(webhookEvent, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
 
@@ -89,7 +102,7 @@ internal sealed class PersistMetaWebhookCommandHandler(
         return Result.Success();
     }
 
-    private static (string? InstagramAccountId, string? InstagramMediaId) ExtractWebhookIds(string payload)
+    private static (string? InstagramAccountId, string? InstagramMediaId, string? CommentId) ExtractWebhookIds(string payload)
     {
         try
         {
@@ -98,6 +111,7 @@ internal sealed class PersistMetaWebhookCommandHandler(
 
             string? instagramAccountId = null;
             string? instagramMediaId = null;
+            string? commentId = null;
 
             if (root.TryGetProperty("entry", out var entries) && entries.GetArrayLength() > 0)
             {
@@ -110,8 +124,11 @@ internal sealed class PersistMetaWebhookCommandHandler(
                 {
                     var value = changes[0].TryGetProperty("value", out var v) ? v : default;
 
-                    if (value.ValueKind == System.Text.Json.JsonValueKind.Object)
+                    if (value.ValueKind == JsonValueKind.Object)
                     {
+                        if (value.TryGetProperty("id", out var cid))
+                            commentId = cid.GetString();
+
                         if (value.TryGetProperty("media", out var media) && media.TryGetProperty("id", out var mid))
                             instagramMediaId = mid.GetString();
 
@@ -121,11 +138,11 @@ internal sealed class PersistMetaWebhookCommandHandler(
                 }
             }
 
-            return (instagramAccountId, instagramMediaId);
+            return (instagramAccountId, instagramMediaId, commentId);
         }
         catch
         {
-            return (null, null);
+            return (null, null, null);
         }
     }
 }
