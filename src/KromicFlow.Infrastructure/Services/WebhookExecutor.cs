@@ -33,8 +33,10 @@ public sealed class WebhookExecutor(
             }
 
             logger.LogInformation(
-                "Comment — Account: {AccountIgId}, Media: {MediaId}, Comment: {CommentId}, From: {FromIgsid} (@{Username}), Text: '{Text}'",
-                parsed.AccountIgId, parsed.MediaId, parsed.CommentId, parsed.FromIgsid, parsed.FromUsername, parsed.CommentText);
+                "Comment — Account: {AccountIgId}, Media: {MediaId}, Comment: {CommentId}, From: {FromId} (@{Username}), ScopedId: {ScopedId}, Text: '{Text}'",
+                parsed.AccountIgId, parsed.MediaId, parsed.CommentId,
+                parsed.FromId, parsed.FromUsername, parsed.FromSelfIgScopedId ?? "none",
+                parsed.CommentText);
 
             var account = await db.InstagramAccounts
                 .FirstOrDefaultAsync(x => x.InstagramUserId == parsed.AccountIgId, cancellationToken);
@@ -44,6 +46,18 @@ public sealed class WebhookExecutor(
                 logger.LogWarning("Account {AccountIgId} not found or disconnected — skipping event {EventId}", parsed.AccountIgId, webhookEvent.EventId);
                 webhookEvent.Status = WebhookStatus.Skipped;
                 webhookEvent.FailureReason = "Account not found or disconnected";
+                webhookEvent.ProcessedUtc = DateTime.UtcNow;
+                return;
+            }
+
+            // Skip comments made by the account owner — prevents infinite reply loops
+            if (parsed.FromId == account.InstagramUserId)
+            {
+                logger.LogInformation(
+                    "Comment {CommentId} is from the account owner (@{Username}), skipping to prevent reply loop",
+                    parsed.CommentId, parsed.FromUsername);
+                webhookEvent.Status = WebhookStatus.Skipped;
+                webhookEvent.FailureReason = "Own-account comment, skipped";
                 webhookEvent.ProcessedUtc = DateTime.UtcNow;
                 return;
             }
@@ -93,22 +107,45 @@ public sealed class WebhookExecutor(
 
                 logger.LogInformation("Automation {AutomationId} matched — firing actions", automation.Id);
 
+                // Public reply — skip if already sent on a previous attempt
                 if (!string.IsNullOrWhiteSpace(automation.PublicReply))
                 {
-                    logger.LogInformation("Posting public reply on comment {CommentId}", parsed.CommentId);
-                    await metaClient.PostCommentReplyAsync(accessToken, parsed.CommentId, automation.PublicReply, cancellationToken);
-                    logger.LogInformation("Public reply posted");
+                    if (webhookEvent.PublicReplySentUtc.HasValue)
+                    {
+                        logger.LogInformation("Public reply already sent at {SentUtc}, skipping re-send", webhookEvent.PublicReplySentUtc);
+                    }
+                    else
+                    {
+                        logger.LogInformation("Posting public reply on comment {CommentId}", parsed.CommentId);
+                        await metaClient.PostCommentReplyAsync(accessToken, parsed.CommentId, automation.PublicReply, cancellationToken);
+                        webhookEvent.PublicReplySentUtc = DateTime.UtcNow;
+                        logger.LogInformation("Public reply posted");
+                    }
                 }
 
+                // Private DM — skip if already sent, use self_ig_scoped_id as recipient
                 if (!string.IsNullOrWhiteSpace(automation.PrivateReply))
                 {
-                    logger.LogInformation("Sending DM to {FromIgsid}", parsed.FromIgsid);
-                    await metaClient.SendDirectMessageAsync(accessToken, account.InstagramUserId, parsed.FromIgsid, automation.PrivateReply, cancellationToken);
-                    logger.LogInformation("DM sent");
+                    if (webhookEvent.PrivateReplySentUtc.HasValue)
+                    {
+                        logger.LogInformation("DM already sent at {SentUtc}, skipping re-send", webhookEvent.PrivateReplySentUtc);
+                    }
+                    else
+                    {
+                        // Meta messages API requires the recipient's IGSID (self_ig_scoped_id),
+                        // NOT their IG_ID (from.id). If the payload doesn't include it (older
+                        // API versions), we fall back to from.id and let Meta return an error.
+                        var recipientId = parsed.FromSelfIgScopedId ?? parsed.FromId;
+                        logger.LogInformation("Sending DM to recipient {RecipientId} (scoped: {HasScoped})",
+                            recipientId, parsed.FromSelfIgScopedId is not null);
+                        await metaClient.SendDirectMessageAsync(accessToken, account.InstagramUserId, recipientId, automation.PrivateReply, cancellationToken);
+                        webhookEvent.PrivateReplySentUtc = DateTime.UtcNow;
+                        logger.LogInformation("DM sent");
+                    }
                 }
 
                 anyFired = true;
-                break; // Fire the first (highest-priority) matching automation only
+                break; // Fire only the first (highest-priority) matching automation
             }
 
             webhookEvent.Status = anyFired ? WebhookStatus.Completed : WebhookStatus.Skipped;
@@ -131,9 +168,12 @@ public sealed class WebhookExecutor(
             }
             else
             {
-                // Back to Pending — the retry sweeper will pick it up
+                // Back to Pending — the retry sweeper picks it up.
+                // PublicReplySentUtc / PrivateReplySentUtc are already set if those steps
+                // succeeded, so they will be skipped on the next attempt.
                 webhookEvent.Status = WebhookStatus.Pending;
-                logger.LogWarning(ex, "Webhook event {EventId} failed (attempt {Attempt}/{MaxRetries}), will retry", webhookEvent.EventId, webhookEvent.RetryCount, MaxRetries);
+                logger.LogWarning(ex, "Webhook event {EventId} failed (attempt {Attempt}/{MaxRetries}), will retry",
+                    webhookEvent.EventId, webhookEvent.RetryCount, MaxRetries);
             }
         }
     }
@@ -144,7 +184,8 @@ public sealed class WebhookExecutor(
         string AccountIgId,
         string MediaId,
         string CommentId,
-        string FromIgsid,
+        string FromId,               // from.id — IG_ID of commenter, used for self-check
+        string? FromSelfIgScopedId,  // from.self_ig_scoped_id — IGSID required by messages API
         string FromUsername,
         string CommentText);
 
@@ -179,22 +220,29 @@ public sealed class WebhookExecutor(
             if (value.TryGetProperty("media", out var mediaEl) && mediaEl.TryGetProperty("id", out var mid))
                 mediaId = mid.GetString();
 
-            string? fromIgsid = null;
+            string? fromId = null;
+            string? fromSelfIgScopedId = null;
             string? fromUsername = null;
+
             if (value.TryGetProperty("from", out var from))
             {
-                if (from.TryGetProperty("id", out var fromIdEl)) fromIgsid = fromIdEl.GetString();
-                if (from.TryGetProperty("username", out var fromUsernameEl)) fromUsername = fromUsernameEl.GetString();
+                if (from.TryGetProperty("id", out var fromIdEl))
+                    fromId = fromIdEl.GetString();
+                if (from.TryGetProperty("self_ig_scoped_id", out var scopedEl))
+                    fromSelfIgScopedId = scopedEl.GetString();
+                if (from.TryGetProperty("username", out var fromUsernameEl))
+                    fromUsername = fromUsernameEl.GetString();
             }
 
-            if (string.IsNullOrEmpty(commentId) || string.IsNullOrEmpty(mediaId) || string.IsNullOrEmpty(fromIgsid))
+            if (string.IsNullOrEmpty(commentId) || string.IsNullOrEmpty(mediaId) || string.IsNullOrEmpty(fromId))
                 return null;
 
             return new CommentPayload(
                 AccountIgId: accountIdEl.GetString()!,
                 MediaId: mediaId,
                 CommentId: commentId,
-                FromIgsid: fromIgsid,
+                FromId: fromId,
+                FromSelfIgScopedId: fromSelfIgScopedId,
                 FromUsername: fromUsername ?? string.Empty,
                 CommentText: commentText);
         }
