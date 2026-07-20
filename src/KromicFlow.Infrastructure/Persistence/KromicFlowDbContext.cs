@@ -1,11 +1,12 @@
 ﻿using KromicFlow.Application.Abstractions;
 using KromicFlow.Domain.Entities;
 using KromicFlow.Domain.Enums;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace KromicFlow.Infrastructure.Persistence;
 
-public sealed class KromicFlowDbContext(DbContextOptions<KromicFlowDbContext> options) : DbContext(options), IKromicFlowDbContext
+public sealed class KromicFlowDbContext(DbContextOptions<KromicFlowDbContext> options) : DbContext(options), IKromicFlowDbContext, IDataProtectionKeyContext
 {
     public DbSet<User> Users => Set<User>();
     public DbSet<AdminUser> AdminUsers => Set<AdminUser>();
@@ -24,6 +25,9 @@ public sealed class KromicFlowDbContext(DbContextOptions<KromicFlowDbContext> op
     public DbSet<NotificationMessage> NotificationMessages => Set<NotificationMessage>();
     public DbSet<OutboxEvent> OutboxEvents => Set<OutboxEvent>();
     public DbSet<DeadLetterEvent> DeadLetterEvents => Set<DeadLetterEvent>();
+
+    // Required by IDataProtectionKeyContext — keys are persisted here across restarts
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
     public async Task<IDbTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
     {

@@ -5,6 +5,7 @@ using KromicFlow.Infrastructure.Background;
 using KromicFlow.Infrastructure.External;
 using KromicFlow.Infrastructure.Persistence;
 using KromicFlow.Infrastructure.Services;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,7 +35,11 @@ public static class DependencyInjection
 
         services.AddDbContext<KromicFlowDbContext>(options => options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
         services.AddMemoryCache();
-        services.AddDataProtection();
+
+        // Persist Data Protection keys to Postgres so tokens survive app restarts/redeployments
+        services.AddDataProtection()
+            .PersistKeysToDbContext<KromicFlowDbContext>()
+            .SetApplicationName("KromicFlow");
         services.AddScoped<IKromicFlowDbContext>(provider => provider.GetRequiredService<KromicFlowDbContext>());
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
