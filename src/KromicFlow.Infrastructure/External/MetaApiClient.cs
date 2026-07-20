@@ -386,22 +386,29 @@ public sealed class MetaApiClient(
         logger.LogInformation("Successfully posted public reply to comment {CommentId}", commentId);
     }
 
-    public async Task SendPrivateReplyAsync(string accessToken, string commentId, string message, CancellationToken cancellationToken)
+    public async Task SendPrivateReplyAsync(string accessToken, string igUserId, string commentId, string message, CancellationToken cancellationToken)
     {
-        // Uses the /{comment-id}/private_replies endpoint which works without a prior
-        // conversation window — designed specifically for comment-triggered DMs.
-        // Requires instagram_manage_comments permission (not instagram_manage_messages).
-        logger.LogInformation("Sending private reply for comment {CommentId}", commentId);
+        // For Instagram Login API, private replies use /{ig_user_id}/messages
+        // with recipient.comment_id — NOT /{comment_id}/private_replies which is
+        // the Facebook Login / Messenger Platform endpoint.
+        // Requires: instagram_business_manage_messages permission.
+        logger.LogInformation("Sending private reply from {IgUserId} for comment {CommentId}", igUserId, commentId);
 
-        var url = $"{options.Value.GraphApiBaseUrl}/{commentId}/private_replies";
-        var body = new Dictionary<string, string>
+        var url = QueryHelpers.AddQueryString(
+            $"{options.Value.GraphApiBaseUrl}/{igUserId}/messages",
+            new Dictionary<string, string> { ["access_token"] = accessToken });
+
+        var payload = new
         {
-            ["message"] = message,
-            ["access_token"] = accessToken
+            recipient = new { comment_id = commentId },
+            message = new { text = message }
         };
 
+        var json = JsonSerializer.Serialize(payload, _jsonOptions);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
         var response = await RetryAsync(
-            () => httpClient.PostAsync(url, new FormUrlEncodedContent(body), cancellationToken),
+            () => httpClient.PostAsync(url, content, cancellationToken),
             cancellationToken);
 
         if (!response.IsSuccessStatusCode)

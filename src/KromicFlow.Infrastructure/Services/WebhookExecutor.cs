@@ -134,7 +134,7 @@ public sealed class WebhookExecutor(
                     else
                     {
                         logger.LogInformation("Sending private reply for comment {CommentId}", parsed.CommentId);
-                        await metaClient.SendPrivateReplyAsync(accessToken, parsed.CommentId, automation.PrivateReply, cancellationToken);
+                        await metaClient.SendPrivateReplyAsync(accessToken, account.InstagramUserId, parsed.CommentId, automation.PrivateReply, cancellationToken);
                         webhookEvent.PrivateReplySentUtc = DateTime.UtcNow;
                         logger.LogInformation("Private reply sent");
                     }
