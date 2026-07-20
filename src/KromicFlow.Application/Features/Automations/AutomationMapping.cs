@@ -19,6 +19,7 @@ internal static class AutomationMapping
                 x.InstagramMedia.InstagramMediaId,
                 x.InstagramMedia.Caption,
                 x.InstagramMedia.ThumbnailUrl,
+                x.InstagramMedia.MediaUrl,
                 x.InstagramMedia.PostedAtUtc
             ))
             .ToListAsync(cancellationToken);

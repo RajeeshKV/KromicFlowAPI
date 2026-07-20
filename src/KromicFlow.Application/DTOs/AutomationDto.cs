@@ -22,5 +22,6 @@ public sealed record MediaForAutomationDto(
     string InstagramMediaId,
     string Caption,
     string ThumbnailUrl,
+    string MediaUrl,
     DateTime PostedAtUtc
 );
