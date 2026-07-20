@@ -123,24 +123,20 @@ public sealed class WebhookExecutor(
                     }
                 }
 
-                // Private DM — skip if already sent, use self_ig_scoped_id as recipient
+                // Private reply — skip if already sent.
+                // Uses /{comment-id}/private_replies — works without a prior conversation window.
                 if (!string.IsNullOrWhiteSpace(automation.PrivateReply))
                 {
                     if (webhookEvent.PrivateReplySentUtc.HasValue)
                     {
-                        logger.LogInformation("DM already sent at {SentUtc}, skipping re-send", webhookEvent.PrivateReplySentUtc);
+                        logger.LogInformation("Private reply already sent at {SentUtc}, skipping re-send", webhookEvent.PrivateReplySentUtc);
                     }
                     else
                     {
-                        // Meta messages API requires the recipient's IGSID (self_ig_scoped_id),
-                        // NOT their IG_ID (from.id). If the payload doesn't include it (older
-                        // API versions), we fall back to from.id and let Meta return an error.
-                        var recipientId = parsed.FromSelfIgScopedId ?? parsed.FromId;
-                        logger.LogInformation("Sending DM to recipient {RecipientId} (scoped: {HasScoped})",
-                            recipientId, parsed.FromSelfIgScopedId is not null);
-                        await metaClient.SendDirectMessageAsync(accessToken, account.InstagramUserId, recipientId, automation.PrivateReply, cancellationToken);
+                        logger.LogInformation("Sending private reply for comment {CommentId}", parsed.CommentId);
+                        await metaClient.SendPrivateReplyAsync(accessToken, parsed.CommentId, automation.PrivateReply, cancellationToken);
                         webhookEvent.PrivateReplySentUtc = DateTime.UtcNow;
-                        logger.LogInformation("DM sent");
+                        logger.LogInformation("Private reply sent");
                     }
                 }
 

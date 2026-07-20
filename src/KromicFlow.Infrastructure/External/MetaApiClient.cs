@@ -386,6 +386,34 @@ public sealed class MetaApiClient(
         logger.LogInformation("Successfully posted public reply to comment {CommentId}", commentId);
     }
 
+    public async Task SendPrivateReplyAsync(string accessToken, string commentId, string message, CancellationToken cancellationToken)
+    {
+        // Uses the /{comment-id}/private_replies endpoint which works without a prior
+        // conversation window — designed specifically for comment-triggered DMs.
+        // Requires instagram_manage_comments permission (not instagram_manage_messages).
+        logger.LogInformation("Sending private reply for comment {CommentId}", commentId);
+
+        var url = $"{options.Value.GraphApiBaseUrl}/{commentId}/private_replies";
+        var body = new Dictionary<string, string>
+        {
+            ["message"] = message,
+            ["access_token"] = accessToken
+        };
+
+        var response = await RetryAsync(
+            () => httpClient.PostAsync(url, new FormUrlEncodedContent(body), cancellationToken),
+            cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+            logger.LogError("Failed to send private reply for comment {CommentId}: {StatusCode} - {Content}", commentId, response.StatusCode, errorContent);
+            throw new MetaApiException($"Failed to send private reply: {response.StatusCode} - {errorContent}");
+        }
+
+        logger.LogInformation("Successfully sent private reply for comment {CommentId}", commentId);
+    }
+
     public async Task SendDirectMessageAsync(string accessToken, string instagramUserId, string recipientIgsid, string message, CancellationToken cancellationToken)
     {
         logger.LogInformation("Sending DM from account {InstagramUserId} to recipient {RecipientIgsid}", instagramUserId, recipientIgsid);

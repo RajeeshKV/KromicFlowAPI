@@ -12,5 +12,7 @@ public interface IMetaApiClient
     Task<List<MetaInstagramMedia>> GetInstagramMediaAsync(string accessToken, string instagramUserId, CancellationToken cancellationToken);
     Task SubscribeToWebhooksAsync(string accessToken, string instagramUserId, CancellationToken cancellationToken);
     Task PostCommentReplyAsync(string accessToken, string commentId, string message, CancellationToken cancellationToken);
+    Task SendPrivateReplyAsync(string accessToken, string commentId, string message, CancellationToken cancellationToken);
+    // Keep for future use when a user has already initiated a conversation (24h window)
     Task SendDirectMessageAsync(string accessToken, string instagramUserId, string recipientIgsid, string message, CancellationToken cancellationToken);
 }
