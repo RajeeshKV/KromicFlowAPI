@@ -6,7 +6,12 @@ public sealed class InstagramAccount : Entity
     public User User { get; set; } = null!;
     
     // Instagram account identifiers
+    // InstagramUserId holds the IG_ID (real Instagram Business Account ID) — this is what
+    // Meta puts in entry.id of webhook payloads and is used for all API calls.
     public string InstagramUserId { get; set; } = string.Empty;
+    // InstagramScopedId holds the app-scoped ID (IGSID) returned by /me?fields=id.
+    // It differs per app and is NOT used for webhook lookup — stored for reference only.
+    public string? InstagramScopedId { get; set; }
     public string FacebookPageId { get; set; } = string.Empty;
     
     // Profile information

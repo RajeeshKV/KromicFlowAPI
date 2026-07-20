@@ -200,12 +200,13 @@ public sealed class MetaApiClient(
 
     private async Task<List<MetaInstagramBusinessAccount>> GetInstagramBusinessAccountAsync(string accessToken, CancellationToken cancellationToken)
     {
-        // For Instagram OAuth, we get the Instagram account directly from the user profile
-        // The user profile already contains the Instagram user ID and username
-        // We need to get additional business account details
+        // Request both `id` (IGSID, app-scoped) and `user_id` (IG_ID, real Business Account ID).
+        // `user_id` is the value Meta puts in entry.id of webhook payloads — it must be stored
+        // as InstagramUserId so webhook lookup works.
+        // `id` is the app-scoped ID (IGSID) — stored separately as InstagramScopedId for reference.
         var query = new Dictionary<string, string>
         {
-            ["fields"] = "id,username,profile_picture_url,account_type",
+            ["fields"] = "id,user_id,username,profile_picture_url,account_type",
             ["access_token"] = accessToken
         };
         var url = QueryHelpers.AddQueryString($"{options.Value.GraphApiBaseUrl}/me", query);
@@ -231,13 +232,17 @@ public sealed class MetaApiClient(
             return [];
         }
 
-        logger.LogInformation("Extracted Instagram account ID from OAuth: {InstagramAccountId}", result.Id);
+        // user_id is the IG_ID used in webhooks; fall back to id if user_id is absent
+        var igId = result.UserId ?? result.Id;
+        logger.LogInformation("Instagram account IDs — IG_ID (user_id, webhook): {IgId}, IGSID (id, app-scoped): {ScopedId}",
+            igId, result.Id);
 
         var instagramAccounts = new List<MetaInstagramBusinessAccount>
         {
             new MetaInstagramBusinessAccount(
-                PageId: string.Empty, // Not applicable for direct Instagram flow
-                InstagramAccountId: result.Id,
+                PageId: string.Empty,          // Not applicable for direct Instagram Login flow
+                InstagramAccountId: igId,       // IG_ID — matches webhook entry.id
+                ScopedId: result.Id,            // IGSID — app-scoped, stored for reference
                 Username: result.Username,
                 ProfilePicture: result.ProfilePictureUrl ?? string.Empty
             )
@@ -277,6 +282,7 @@ public sealed class MetaApiClient(
         return new MetaInstagramBusinessAccount(
             PageId: string.Empty, // Not available in profile refresh
             InstagramAccountId: instagramAccountId,
+            ScopedId: null, // Not available in profile refresh
             Username: result.Username,
             ProfilePicture: result.ProfilePictureUrl
         );
@@ -357,7 +363,7 @@ public sealed class MetaApiClient(
 
     private record MetaTokenResponse(string? AccessToken, string? TokenType, long? ExpiresIn);
     private record MetaUser(string UserId, string Username);
-    private record MetaInstagramBusinessAccountResponse(string Id, string Username, string? ProfilePictureUrl, string? AccountType);
+    private record MetaInstagramBusinessAccountResponse(string Id, string? UserId, string Username, string? ProfilePictureUrl, string? AccountType);
     private record MetaInstagramProfileResponse(string Username, string ProfilePictureUrl);
     private record MetaMediaItem(string Id, string MediaType, string? Caption, string? ThumbnailUrl, string? MediaUrl, string? Permalink, string Timestamp, int? LikeCount, int? CommentsCount);
     private record MetaMediaResponse(List<MetaMediaItem> Data);

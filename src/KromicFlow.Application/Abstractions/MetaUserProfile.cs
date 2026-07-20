@@ -1,6 +1,6 @@
 ﻿namespace KromicFlow.Application.Abstractions;
 
-public sealed record MetaInstagramBusinessAccount(string PageId, string InstagramAccountId, string Username, string ProfilePicture);
+public sealed record MetaInstagramBusinessAccount(string PageId, string InstagramAccountId, string? ScopedId, string Username, string ProfilePicture);
 
 public sealed record MetaInstagramMedia(
     string Id,

@@ -151,6 +151,7 @@ public sealed class KromicFlowDbContext(DbContextOptions<KromicFlowDbContext> op
             
             // Property configurations
             entity.Property(x => x.InstagramUserId).HasMaxLength(100);
+            entity.Property(x => x.InstagramScopedId).HasMaxLength(100);
             entity.Property(x => x.FacebookPageId).HasMaxLength(100);
             entity.Property(x => x.Username).HasMaxLength(160);
             entity.Property(x => x.DisplayName).HasMaxLength(200);

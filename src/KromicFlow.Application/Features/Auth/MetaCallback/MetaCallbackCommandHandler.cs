@@ -60,7 +60,8 @@ internal sealed class MetaCallbackCommandHandler(
                 var newAccount = new InstagramAccount
                 {
                     User = user,
-                    InstagramUserId = igAccount.InstagramAccountId,
+                    InstagramUserId = igAccount.InstagramAccountId,  // IG_ID — matches webhook entry.id
+                    InstagramScopedId = igAccount.ScopedId,          // IGSID — app-scoped, for reference
                     FacebookPageId = igAccount.PageId,
                     Username = igAccount.Username,
                     DisplayName = igAccount.Username,
@@ -78,6 +79,7 @@ internal sealed class MetaCallbackCommandHandler(
             else
             {
                 // Update existing account - re-connect since user just authenticated
+                existingAccount.InstagramScopedId = igAccount.ScopedId;  // Refresh IGSID in case it changed
                 existingAccount.FacebookPageId = igAccount.PageId;
                 existingAccount.Username = igAccount.Username;
                 existingAccount.DisplayName = igAccount.Username;
