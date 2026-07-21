@@ -11,6 +11,12 @@ public sealed class User : Entity
     public bool IsActive { get; set; } = true;
     public bool MarketingEmailEnabled { get; set; } = true;
     public bool MarketingPushEnabled { get; set; } = true;
+    
+    // Email verification
+    public bool EmailVerified { get; set; } = false;
+    public string? EmailVerificationToken { get; set; }
+    public DateTime? EmailVerificationTokenExpiresUtc { get; set; }
+    
     public Guid PlanId { get; set; }
     public Plan Plan { get; set; } = null!;
     public UserRestriction? Restriction { get; set; }

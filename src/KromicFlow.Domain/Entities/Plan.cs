@@ -17,4 +17,11 @@ public sealed class Plan : Entity
     // 0 = free plan
     public int PriceInrPaise { get; set; } = 0;
     public string BillingPeriod { get; set; } = "monthly"; // monthly, yearly, lifetime
+
+    /// <summary>
+    /// The Razorpay plan_id (e.g. plan_xxxx) that corresponds to this plan.
+    /// Set this from the Razorpay Dashboard or via the admin API.
+    /// Null means Razorpay is not configured for this plan.
+    /// </summary>
+    public string? RazorpayPlanId { get; set; }
 }

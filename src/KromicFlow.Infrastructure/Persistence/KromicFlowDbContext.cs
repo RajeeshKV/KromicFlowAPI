@@ -25,6 +25,7 @@ public sealed class KromicFlowDbContext(DbContextOptions<KromicFlowDbContext> op
     public DbSet<NotificationMessage> NotificationMessages => Set<NotificationMessage>();
     public DbSet<OutboxEvent> OutboxEvents => Set<OutboxEvent>();
     public DbSet<DeadLetterEvent> DeadLetterEvents => Set<DeadLetterEvent>();
+    public DbSet<UserSubscription> UserSubscriptions => Set<UserSubscription>();
 
     // Required by IDataProtectionKeyContext — keys are persisted here across restarts
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
@@ -119,6 +120,7 @@ public sealed class KromicFlowDbContext(DbContextOptions<KromicFlowDbContext> op
             entity.Property(x => x.Code).HasMaxLength(80);
             entity.Property(x => x.Name).HasMaxLength(160);
             entity.Property(x => x.BillingPeriod).HasMaxLength(20).HasDefaultValue("monthly");
+            entity.Property(x => x.RazorpayPlanId).HasMaxLength(60);
             entity.Property(x => x.ConfigurationJson).HasColumnType("jsonb");
             entity.HasData(
                 new Plan
@@ -318,6 +320,21 @@ public sealed class KromicFlowDbContext(DbContextOptions<KromicFlowDbContext> op
             entity.Property(x => x.EventType).HasMaxLength(200);
             entity.Property(x => x.Payload).HasColumnType("jsonb");
             entity.Property(x => x.Error).HasColumnType("text");
+        });
+
+        modelBuilder.Entity<UserSubscription>(entity =>
+        {
+            entity.HasIndex(x => x.UserId);
+            entity.HasIndex(x => x.RazorpaySubscriptionId).IsUnique();
+            entity.HasIndex(x => new { x.UserId, x.Status });
+            entity.Property(x => x.RazorpaySubscriptionId).HasMaxLength(60);
+            entity.Property(x => x.RazorpayPlanId).HasMaxLength(60);
+            entity.Property(x => x.RazorpayCustomerId).HasMaxLength(60);
+            entity.Property(x => x.RazorpayPaymentId).HasMaxLength(60);
+            entity.Property(x => x.Status).HasMaxLength(30);
+            entity.Property(x => x.RazorpaySnapshotJson).HasColumnType("jsonb");
+            entity.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Plan).WithMany().HasForeignKey(x => x.PlanId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

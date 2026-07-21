@@ -31,8 +31,13 @@ internal sealed class UpsertPlanCommandHandler(IKromicFlowDbContext db, IAuditWr
         plan.MonthlyAutomationRuns = request.MonthlyAutomationRuns;
         plan.MonthlyEmails = request.MonthlyEmails;
         plan.MonthlyPushNotifications = request.MonthlyPushNotifications;
+        plan.PriceInrPaise = request.PriceInrPaise;
+        plan.BillingPeriod = request.BillingPeriod;
+        // Only update RazorpayPlanId if explicitly provided (null = don't change existing value)
+        if (request.RazorpayPlanId is not null)
+            plan.RazorpayPlanId = string.IsNullOrWhiteSpace(request.RazorpayPlanId) ? null : request.RazorpayPlanId;
         await db.SaveChangesAsync(cancellationToken);
         await auditWriter.WriteAsync("PlanUpserted", nameof(Plan), plan.Id.ToString(), null, request.AdminId, null, cancellationToken);
-        return Result<PlanDto>.Success(new PlanDto(plan.Id, plan.Code, plan.Name, plan.IsActive, plan.IsDefault, plan.MaxInstagramAccounts, plan.MaxAutomations, plan.MonthlyAutomationRuns, plan.MonthlyEmails, plan.MonthlyPushNotifications));
+        return Result<PlanDto>.Success(new PlanDto(plan.Id, plan.Code, plan.Name, plan.IsActive, plan.IsDefault, plan.MaxInstagramAccounts, plan.MaxAutomations, plan.MonthlyAutomationRuns, plan.MonthlyEmails, plan.MonthlyPushNotifications, plan.PriceInrPaise, plan.BillingPeriod, plan.RazorpayPlanId));
     }
 }

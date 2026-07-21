@@ -3,6 +3,7 @@ using System;
 using KromicFlow.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace KromicFlow.Infrastructure.Migrations
 {
     [DbContext(typeof(KromicFlowDbContext))]
-    partial class KromicFlowDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260720152119_AddRazorpaySubscriptions")]
+    partial class AddRazorpaySubscriptions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -843,15 +846,6 @@ namespace KromicFlow.Infrastructure.Migrations
                     b.Property<string>("Email")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
-
-                    b.Property<string>("EmailVerificationToken")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("EmailVerificationTokenExpiresUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("EmailVerified")
-                        .HasColumnType("boolean");
 
                     b.Property<string>("FullName")
                         .IsRequired()

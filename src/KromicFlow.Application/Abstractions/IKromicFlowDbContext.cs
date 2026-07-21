@@ -22,6 +22,7 @@ public interface IKromicFlowDbContext
     DbSet<NotificationMessage> NotificationMessages { get; }
     DbSet<OutboxEvent> OutboxEvents { get; }
     DbSet<DeadLetterEvent> DeadLetterEvents { get; }
+    DbSet<UserSubscription> UserSubscriptions { get; }
     Task<IDbTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default);
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

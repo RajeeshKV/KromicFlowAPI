@@ -6,8 +6,7 @@ using KromicFlow.Infrastructure.External;
 using KromicFlow.Infrastructure.Persistence;
 using KromicFlow.Infrastructure.Services;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
+using Microsoft.EntityFrameworkCore;using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Polly;
@@ -28,6 +27,8 @@ public static class DependencyInjection
             .Bind(configuration.GetSection("Brevo"))
             .ValidateDataAnnotations()
             .ValidateOnStart();
+        services.AddOptions<RazorpayOptions>()
+            .Bind(configuration.GetSection("Razorpay"));
         services.AddOptions<PlatformOptions>()
             .Bind(configuration.GetSection("Platform"))
             .ValidateDataAnnotations()
@@ -53,6 +54,10 @@ public static class DependencyInjection
         services.AddScoped<IWebhookExecutor, WebhookExecutor>();
         services.AddScoped<IPlanEnforcementService, PlanEnforcementService>();
         services.AddHttpClient<IMetaApiClient, MetaApiClient>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
+        services.AddHttpClient<IRazorpayClient, RazorpayClient>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(30);
         });
