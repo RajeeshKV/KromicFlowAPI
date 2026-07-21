@@ -1,8 +1,10 @@
 using KromicFlow.Application.Abstractions;
 using KromicFlow.Application.Common;
+using KromicFlow.Application.Options;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace KromicFlow.Application.Features.Users.SendVerificationEmail;
 
@@ -12,6 +14,7 @@ internal sealed class SendVerificationEmailCommandHandler(
     IEmailTemplateService emailTemplateService,
     INotificationSender notificationSender,
     IAuditWriter auditWriter,
+    IOptions<PlatformOptions> platformOptions,
     ILogger<SendVerificationEmailCommandHandler> logger) : IRequestHandler<SendVerificationEmailCommand, Result>
 {
     public async Task<Result> Handle(SendVerificationEmailCommand request, CancellationToken cancellationToken)
@@ -55,7 +58,7 @@ internal sealed class SendVerificationEmailCommandHandler(
         user.Email = request.Email; // Store the email provided by user
 
         // Create verification link (frontend will use this)
-        var verificationLink = $"https://yourdomain.com/verify-email?token={Uri.EscapeDataString(token)}";
+        var verificationLink = $"{platformOptions.Value.EmailVerificationRedirectUrl}?token={Uri.EscapeDataString(token)}";
 
         // Prepare email template parameters
         var templateParams = new Dictionary<string, string>

@@ -10,7 +10,15 @@ public sealed class BrevoNotificationSender(HttpClient httpClient, IOptions<Brev
 {
     public async Task<string?> SendEmailAsync(string toEmail, string subject, string body, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(options.Value.ApiKey)) return null;
+        if (string.IsNullOrWhiteSpace(options.Value.ApiKey))
+        {
+            throw new InvalidOperationException("Brevo API key is not configured. Set Brevo__ApiKey environment variable.");
+        }
+
+        if (string.IsNullOrWhiteSpace(options.Value.SenderEmail))
+        {
+            throw new InvalidOperationException("Brevo sender email is not configured. Set Brevo__SenderEmail environment variable.");
+        }
 
         httpClient.DefaultRequestHeaders.Remove("api-key");
         httpClient.DefaultRequestHeaders.Add("api-key", options.Value.ApiKey);
@@ -24,9 +32,20 @@ public sealed class BrevoNotificationSender(HttpClient httpClient, IOptions<Brev
             htmlContent = body
         };
 
-        var response = await httpClient.PostAsJsonAsync("/v3/smtp/email", payload, cancellationToken);
-        response.EnsureSuccessStatusCode();
-        return response.Headers.TryGetValues("x-message-id", out var values) ? values.FirstOrDefault() : null;
+        try
+        {
+            var response = await httpClient.PostAsJsonAsync("/v3/smtp/email", payload, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                throw new InvalidOperationException($"Brevo API error ({response.StatusCode}): {errorContent}");
+            }
+            return response.Headers.TryGetValues("x-message-id", out var values) ? values.FirstOrDefault() : null;
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new InvalidOperationException("Failed to send email via Brevo. Check API key configuration.", ex);
+        }
     }
 
     /// <summary>
