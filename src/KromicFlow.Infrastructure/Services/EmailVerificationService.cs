@@ -1,24 +1,12 @@
+using KromicFlow.Application.Abstractions;
 using System.Security.Cryptography;
 using System.Text;
 
 namespace KromicFlow.Infrastructure.Services;
 
 /// <summary>
-/// Service for generating and validating email verification tokens
+/// Implementation of email verification token service
 /// </summary>
-public interface IEmailVerificationService
-{
-    /// <summary>
-    /// Generate a secure email verification token
-    /// </summary>
-    string GenerateToken();
-
-    /// <summary>
-    /// Get the expiration time for a verification token (24 hours from now)
-    /// </summary>
-    DateTime GetTokenExpirationTime();
-}
-
 public sealed class EmailVerificationService : IEmailVerificationService
 {
     /// <summary>

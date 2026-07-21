@@ -3,4 +3,4 @@ using MediatR;
 
 namespace KromicFlow.Application.Features.Users.SendVerificationEmail;
 
-public sealed record SendVerificationEmailCommand(Guid UserId) : IRequest<Result>;
+public sealed record SendVerificationEmailCommand(Guid UserId, string Email) : IRequest<Result>;

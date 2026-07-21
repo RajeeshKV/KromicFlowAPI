@@ -53,6 +53,7 @@ public static class DependencyInjection
         services.AddScoped<IAutomationScopeService, AutomationScopeService>();
         services.AddScoped<IWebhookExecutor, WebhookExecutor>();
         services.AddScoped<IPlanEnforcementService, PlanEnforcementService>();
+        services.AddScoped<IEmailVerificationService, EmailVerificationService>();
         services.AddHttpClient<IMetaApiClient, MetaApiClient>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(30);
