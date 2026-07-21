@@ -126,7 +126,7 @@ internal sealed class MetaCallbackCommandHandler(
         await auditWriter.WriteAsync("Login", nameof(User), user.Id.ToString(), user.Id, null, null, cancellationToken);
 
         var tokens = jwtTokenService.CreateUserToken(user, session) with { RefreshToken = refreshToken };
-        var dto = new UserProfileDto(user.Id, user.Email, user.FullName, user.Role.ToString(), plan.Code, user.IsActive, user.MarketingEmailEnabled, user.MarketingPushEnabled);
+        var dto = new UserProfileDto(user.Id, user.Email, user.FullName, user.Role.ToString(), plan.Code, user.IsActive, user.EmailVerified, user.MarketingEmailEnabled, user.MarketingPushEnabled);
         return Result<LoginResponseDto>.Success(new LoginResponseDto(tokens, dto));
     }
 }
