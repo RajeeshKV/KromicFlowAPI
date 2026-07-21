@@ -17,5 +17,5 @@ public sealed class PlatformOptions
     /// Frontend URL for email verification redirect
     /// Example: https://yourdomain.com/verify-email
     /// </summary>
-    public string EmailVerificationRedirectUrl { get; set; } = "https://yourdomain.com/verify-email";
+    public string EmailVerificationRedirectUrl { get; set; } = "https://flow.kromic.in/verify-email";
 }

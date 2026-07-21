@@ -48,6 +48,16 @@ internal sealed class SendVerificationEmailCommandHandler(
             return Result.Failure("Too many verification requests. Please try again in 1 hour");
         }
 
+        // Check if email is already used by another user
+        var emailExists = await db.Users
+            .AnyAsync(x => x.Email == request.Email && x.Id != request.UserId, cancellationToken);
+
+        if (emailExists)
+        {
+            logger.LogWarning("Email {Email} is already in use by another user", request.Email);
+            return Result.Failure("This email is already in use. Please use a different email address");
+        }
+
         // Generate verification token
         var token = emailVerificationService.GenerateToken();
         var tokenExpiry = emailVerificationService.GetTokenExpirationTime();

@@ -34,6 +34,22 @@ internal sealed class MetaCallbackCommandHandler(
         var plan = await db.Plans.FirstOrDefaultAsync(x => x.Code == platformOptions.Value.DefaultPlanCode, cancellationToken)
             ?? await db.Plans.FirstAsync(x => x.IsDefault, cancellationToken);
 
+        // Check if any of the Instagram accounts already belong to a different user
+        var firstIgAccount = profile.InstagramAccounts.FirstOrDefault();
+        if (firstIgAccount is not null)
+        {
+            var existingAccountForOtherUser = await db.InstagramAccounts
+                .Include(x => x.User)
+                .FirstOrDefaultAsync(x => x.InstagramUserId == firstIgAccount.InstagramAccountId, cancellationToken);
+            
+            if (existingAccountForOtherUser is not null)
+            {
+                logger.LogWarning("Instagram account {InstagramUserId} is already connected to user {ExistingUserId}. Attempting to connect with user email {Email}", 
+                    firstIgAccount.InstagramAccountId, existingAccountForOtherUser.UserId, profile.Email);
+                return Result<LoginResponseDto>.Failure("This Instagram account is already connected to another user. Please use a different Instagram account or contact support.");
+            }
+        }
+
         var user = await db.Users.Include(x => x.Plan).FirstOrDefaultAsync(x => x.Email == profile.Email, cancellationToken);
         if (user is null)
         {
