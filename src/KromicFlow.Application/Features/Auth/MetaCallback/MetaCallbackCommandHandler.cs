@@ -34,32 +34,63 @@ internal sealed class MetaCallbackCommandHandler(
         var plan = await db.Plans.FirstOrDefaultAsync(x => x.Code == platformOptions.Value.DefaultPlanCode, cancellationToken)
             ?? await db.Plans.FirstAsync(x => x.IsDefault, cancellationToken);
 
-        // Check if any of the Instagram accounts already belong to a different user
+        // Instagram account is the source of truth for user identity
         var firstIgAccount = profile.InstagramAccounts.FirstOrDefault();
-        if (firstIgAccount is not null)
+        if (firstIgAccount is null)
         {
-            var existingAccountForOtherUser = await db.InstagramAccounts
-                .Include(x => x.User)
-                .FirstOrDefaultAsync(x => x.InstagramUserId == firstIgAccount.InstagramAccountId, cancellationToken);
+            logger.LogWarning("No Instagram accounts found in OAuth profile");
+            return Result<LoginResponseDto>.Failure("No Instagram accounts associated with this account");
+        }
+
+        // Check if this Instagram account is already connected to a user
+        var existingInstagramAccount = await db.InstagramAccounts
+            .Include(x => x.User)
+            .FirstOrDefaultAsync(x => x.InstagramUserId == firstIgAccount.InstagramAccountId, cancellationToken);
+
+        Domain.Entities.User user;
+
+        if (existingInstagramAccount is not null)
+        {
+            // Instagram account already exists - use the associated user (re-login)
+            user = existingInstagramAccount.User;
+            logger.LogInformation("User {UserId} re-authenticating with Instagram account {InstagramUserId}", 
+                user.Id, firstIgAccount.InstagramAccountId);
+        }
+        else
+        {
+            // New Instagram account - create new user or find existing by email
+            user = null;
             
-            if (existingAccountForOtherUser is not null)
+            // Try to find user by email if email is provided
+            if (!string.IsNullOrEmpty(profile.Email))
             {
-                logger.LogWarning("Instagram account {InstagramUserId} is already connected to user {ExistingUserId}. Attempting to connect with user email {Email}", 
-                    firstIgAccount.InstagramAccountId, existingAccountForOtherUser.UserId, profile.Email);
-                return Result<LoginResponseDto>.Failure("This Instagram account is already connected to another user. Please use a different Instagram account or contact support.");
+                user = await db.Users.Include(x => x.Plan).FirstOrDefaultAsync(x => x.Email == profile.Email, cancellationToken);
+                if (user is not null)
+                {
+                    logger.LogInformation("Found existing user {UserId} by email {Email}, connecting new Instagram account", 
+                        user.Id, profile.Email);
+                }
+            }
+
+            // Create new user if no existing user found
+            if (user is null)
+            {
+                user = new Domain.Entities.User 
+                { 
+                    Email = profile.Email, 
+                    FullName = profile.FullName, 
+                    PlanId = plan.Id, 
+                    Plan = plan 
+                };
+                db.Users.Add(user);
+                db.TermsAcceptances.Add(new TermsAcceptance { User = user, TermsVersion = platformOptions.Value.TermsVersion });
+                logger.LogInformation("Created new user for Instagram account {InstagramUserId}", firstIgAccount.InstagramAccountId);
             }
         }
 
-        var user = await db.Users.Include(x => x.Plan).FirstOrDefaultAsync(x => x.Email == profile.Email, cancellationToken);
-        if (user is null)
-        {
-            user = new Domain.Entities.User { Email = profile.Email, FullName = profile.FullName, PlanId = plan.Id, Plan = plan };
-            db.Users.Add(user);
-            db.TermsAcceptances.Add(new TermsAcceptance { User = user, TermsVersion = platformOptions.Value.TermsVersion });
-        }
-
         var loginBlocked = await db.UserRestrictions.AnyAsync(x => x.UserId == user.Id && x.LoginBlocked, cancellationToken);
-        if (!user.IsActive || loginBlocked) return Result<LoginResponseDto>.Failure("User login is restricted.");
+        if (!user.IsActive || loginBlocked) 
+            return Result<LoginResponseDto>.Failure("User login is restricted.");
 
         var encryptedToken = dataProtectionService.Protect(profile.AccessToken);
         var tokenExpiry = DateTime.UtcNow.AddDays(60);
@@ -86,7 +117,7 @@ internal sealed class MetaCallbackCommandHandler(
                     TokenExpiresUtc = tokenExpiry,
                     LastTokenRefreshUtc = DateTime.UtcNow,
                     TokenStatus = "active",
-                    IsConnected = true, // Auto-connect after OAuth authentication
+                    IsConnected = true,
                     ConnectedAtUtc = DateTime.UtcNow,
                     RefreshRequired = false
                 };
@@ -95,7 +126,7 @@ internal sealed class MetaCallbackCommandHandler(
             else
             {
                 // Update existing account - re-connect since user just authenticated
-                existingAccount.InstagramScopedId = igAccount.ScopedId;  // Refresh IGSID in case it changed
+                existingAccount.InstagramScopedId = igAccount.ScopedId;
                 existingAccount.FacebookPageId = igAccount.PageId;
                 existingAccount.Username = igAccount.Username;
                 existingAccount.DisplayName = igAccount.Username;
@@ -106,9 +137,9 @@ internal sealed class MetaCallbackCommandHandler(
                 existingAccount.TokenStatus = "active";
                 existingAccount.RefreshRequired = false;
                 existingAccount.UpdatedUtc = DateTime.UtcNow;
-                existingAccount.IsConnected = true; // Re-connect on re-authentication
+                existingAccount.IsConnected = true;
                 existingAccount.ConnectedAtUtc = existingAccount.ConnectedAtUtc ?? DateTime.UtcNow;
-                existingAccount.DisconnectedAtUtc = null; // Clear disconnect timestamp
+                existingAccount.DisconnectedAtUtc = null;
             }
         }
 
@@ -120,7 +151,6 @@ internal sealed class MetaCallbackCommandHandler(
         }
         catch (Exception ex)
         {
-            // Log but don't fail the login if webhook subscription fails
             logger.LogWarning(ex, "Failed to subscribe to webhooks for user {InstagramUserId}", profile.InstagramUserId);
         }
 
@@ -139,7 +169,7 @@ internal sealed class MetaCallbackCommandHandler(
         db.Sessions.Add(session);
         db.UserActivities.Add(new UserActivity { User = user, Type = ActivityType.Login, Description = "Meta OAuth login" });
         await db.SaveChangesAsync(cancellationToken);
-        await auditWriter.WriteAsync("Login", nameof(User), user.Id.ToString(), user.Id, null, null, cancellationToken);
+        await auditWriter.WriteAsync("Login", nameof(Domain.Entities.User), user.Id.ToString(), user.Id, null, null, cancellationToken);
 
         var tokens = jwtTokenService.CreateUserToken(user, session) with { RefreshToken = refreshToken };
         var dto = new UserProfileDto(user.Id, user.Email, user.FullName, user.Role.ToString(), plan.Code, user.IsActive, user.EmailVerified, user.MarketingEmailEnabled, user.MarketingPushEnabled);
