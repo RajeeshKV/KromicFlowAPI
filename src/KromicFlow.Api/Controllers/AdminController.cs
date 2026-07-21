@@ -23,6 +23,22 @@ public sealed class AdminController(IMediator mediator) : ApiControllerBase
     public async Task<IActionResult> Audit([FromQuery] int page = 1, [FromQuery] int pageSize = 25, CancellationToken cancellationToken = default) =>
         Ok(await mediator.Send(new ListAuditLogsQuery(page, pageSize), cancellationToken));
 
+    [HttpGet("restrictions")]
+    public async Task<IActionResult> ListRestrictions([FromQuery] int page = 1, [FromQuery] int pageSize = 25, CancellationToken cancellationToken = default) =>
+        Ok(await mediator.Send(new ListUserRestrictionsQuery(page, pageSize), cancellationToken));
+
+    [HttpGet("plans")]
+    public async Task<IActionResult> ListPlans([FromQuery] int page = 1, [FromQuery] int pageSize = 25, CancellationToken cancellationToken = default) =>
+        Ok(await mediator.Send(new ListPlansQuery(page, pageSize), cancellationToken));
+
+    [HttpGet("settings")]
+    public async Task<IActionResult> ListSettings([FromQuery] int page = 1, [FromQuery] int pageSize = 50, CancellationToken cancellationToken = default) =>
+        Ok(await mediator.Send(new ListRuntimeSettingsQuery(page, pageSize), cancellationToken));
+
+    [HttpGet("notifications")]
+    public async Task<IActionResult> ListNotifications([FromQuery] int page = 1, [FromQuery] int pageSize = 25, CancellationToken cancellationToken = default) =>
+        Ok(await mediator.Send(new ListNotificationsQuery(page, pageSize), cancellationToken));
+
     [HttpPost("users/{userId:guid}/restriction")]
     public async Task<IActionResult> RestrictUser(Guid userId, [FromBody] UserRestrictionRequest request, CancellationToken cancellationToken) =>
         FromResult(await mediator.Send(new SetUserRestrictionCommand(User.GetSubjectId(), userId, request.LoginBlocked, request.AutomationBlocked, request.NotificationBlocked, request.Reason), cancellationToken));
