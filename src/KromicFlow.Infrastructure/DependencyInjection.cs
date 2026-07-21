@@ -33,6 +33,8 @@ public static class DependencyInjection
             .Bind(configuration.GetSection("Platform"))
             .ValidateDataAnnotations()
             .ValidateOnStart();
+        services.AddOptions<EmailTemplateOptions>()
+            .Bind(configuration.GetSection("EmailTemplates"));
 
         services.AddDbContext<KromicFlowDbContext>(options => options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
         services.AddMemoryCache();
@@ -54,6 +56,7 @@ public static class DependencyInjection
         services.AddScoped<IWebhookExecutor, WebhookExecutor>();
         services.AddScoped<IPlanEnforcementService, PlanEnforcementService>();
         services.AddScoped<IEmailVerificationService, EmailVerificationService>();
+        services.AddScoped<IEmailTemplateService, EmailTemplateService>();
         services.AddHttpClient<IMetaApiClient, MetaApiClient>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(30);

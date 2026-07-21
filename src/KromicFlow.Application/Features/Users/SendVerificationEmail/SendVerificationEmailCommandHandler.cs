@@ -9,6 +9,7 @@ namespace KromicFlow.Application.Features.Users.SendVerificationEmail;
 internal sealed class SendVerificationEmailCommandHandler(
     IKromicFlowDbContext db,
     IEmailVerificationService emailVerificationService,
+    IEmailTemplateService emailTemplateService,
     INotificationSender notificationSender,
     IAuditWriter auditWriter,
     ILogger<SendVerificationEmailCommandHandler> logger) : IRequestHandler<SendVerificationEmailCommand, Result>
@@ -56,23 +57,22 @@ internal sealed class SendVerificationEmailCommandHandler(
         // Create verification link (frontend will use this)
         var verificationLink = $"https://yourdomain.com/verify-email?token={Uri.EscapeDataString(token)}";
 
-        // Send email via Brevo
-        var emailBody = $@"
-<h2>Verify Your Email</h2>
-<p>Hi {user.FullName},</p>
-<p>Thank you for signing up for KromicFlow!</p>
-<p>To activate your automations, please verify your email by clicking the link below:</p>
-<p><a href=""{verificationLink}"" style=""background-color: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; display: inline-block;"">Verify Email</a></p>
-<p>Or copy and paste this link: {verificationLink}</p>
-<p>This link expires in 24 hours.</p>
-<p>If you didn't sign up, you can ignore this email.</p>
-<p>Best regards,<br>KromicFlow Team</p>";
+        // Prepare email template parameters
+        var templateParams = new Dictionary<string, string>
+        {
+            { "fullName", user.FullName },
+            { "verificationLink", verificationLink }
+        };
+
+        // Render email subject and body
+        var subject = emailTemplateService.RenderSubject(EmailTemplateType.VerificationEmail, templateParams);
+        var emailBody = emailTemplateService.RenderBody(EmailTemplateType.VerificationEmail, templateParams);
 
         try
         {
             var messageId = await notificationSender.SendEmailAsync(
                 request.Email,
-                "Verify your KromicFlow email",
+                subject,
                 emailBody,
                 cancellationToken);
 

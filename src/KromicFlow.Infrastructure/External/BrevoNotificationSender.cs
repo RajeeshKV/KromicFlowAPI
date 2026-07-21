@@ -29,6 +29,34 @@ public sealed class BrevoNotificationSender(HttpClient httpClient, IOptions<Brev
         return response.Headers.TryGetValues("x-message-id", out var values) ? values.FirstOrDefault() : null;
     }
 
+    /// <summary>
+    /// Send email using Brevo transactional template
+    /// </summary>
+    public async Task<string?> SendEmailWithTemplateAsync(
+        string toEmail,
+        int templateId,
+        Dictionary<string, string> templateParams,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(options.Value.ApiKey)) return null;
+
+        httpClient.DefaultRequestHeaders.Remove("api-key");
+        httpClient.DefaultRequestHeaders.Add("api-key", options.Value.ApiKey);
+        httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+        var payload = new
+        {
+            sender = new { email = options.Value.SenderEmail, name = options.Value.SenderName },
+            to = new[] { new { email = toEmail } },
+            templateId,
+            @params = templateParams
+        };
+
+        var response = await httpClient.PostAsJsonAsync("/v3/smtp/email", payload, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return response.Headers.TryGetValues("x-message-id", out var values) ? values.FirstOrDefault() : null;
+    }
+
     public Task<string?> SendPushAsync(Guid userId, string subject, string body, CancellationToken cancellationToken)
     {
         return Task.FromResult<string?>(null);
