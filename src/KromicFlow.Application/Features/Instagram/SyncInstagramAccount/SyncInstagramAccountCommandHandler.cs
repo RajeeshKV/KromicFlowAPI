@@ -29,27 +29,38 @@ internal sealed class SyncInstagramAccountCommandHandler(
         var accessToken = dataProtectionService.Unprotect(account.AccessTokenEncrypted);
         logger.LogInformation("Access token decrypted for account {InstagramUserId}", account.InstagramUserId);
 
-        // Validate token expiry
-        if (account.TokenExpiresUtc.HasValue && account.TokenExpiresUtc.Value < DateTime.UtcNow.AddDays(7))
+        // Validate token expiry — only refresh if actually expired
+        if (account.TokenExpiresUtc.HasValue && account.TokenExpiresUtc.Value <= DateTime.UtcNow)
         {
-            // Token is expiring soon, attempt to refresh
+            // Token is already expired, attempt to refresh
             try
             {
-                logger.LogInformation("Token expiring soon, attempting refresh");
+                logger.LogInformation("Token expired, attempting refresh for account {AccountId}", account.Id);
                 var refreshedToken = await metaApiClient.RefreshLongLivedTokenAsync(accessToken, cancellationToken);
                 account.AccessTokenEncrypted = dataProtectionService.Protect(refreshedToken);
                 account.TokenExpiresUtc = DateTime.UtcNow.AddDays(60);
                 account.LastTokenRefreshUtc = DateTime.UtcNow;
                 account.TokenStatus = "active";
+                account.RefreshRequired = false;
                 accessToken = refreshedToken;
                 logger.LogInformation("Token refreshed successfully");
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Token refresh failed for account {AccountId}", account.Id);
-                account.TokenStatus = "expired";
+                account.TokenStatus = "invalid";
+                account.RefreshRequired = true;
                 await db.SaveChangesAsync(cancellationToken);
-                return Result.Failure("Token has expired and could not be refreshed. Please re-authenticate.");
+                return Result.Failure("Instagram token has expired and could not be refreshed. Please re-authenticate.");
+            }
+        }
+        else if (account.TokenExpiresUtc.HasValue && account.TokenExpiresUtc.Value < DateTime.UtcNow.AddDays(7))
+        {
+            // Token expiring within 7 days — mark for background refresh but don't call Meta now
+            if (!account.RefreshRequired)
+            {
+                logger.LogInformation("Token expiring soon (within 7 days), marking for background refresh, account {AccountId}", account.Id);
+                account.RefreshRequired = true;
             }
         }
 

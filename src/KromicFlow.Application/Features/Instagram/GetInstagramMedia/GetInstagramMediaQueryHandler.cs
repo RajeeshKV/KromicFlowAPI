@@ -122,25 +122,41 @@ internal sealed class GetInstagramMediaQueryHandler(
             throw new InvalidOperationException("Access token cannot be decrypted. Please re-authenticate your Instagram account.", ex);
         }
 
-        // Refresh token if needed
-        if (account.TokenExpiresUtc.HasValue && account.TokenExpiresUtc.Value < DateTime.UtcNow.AddDays(7))
+        // Refresh token ONLY if it's actually expired or invalid
+        // Background service handles proactive refresh (7-day threshold)
+        // Only do on-demand refresh if token is already expired
+        if (account.TokenExpiresUtc.HasValue && account.TokenExpiresUtc.Value <= DateTime.UtcNow)
         {
             try
             {
-                logger.LogInformation("Token expiring soon, attempting refresh");
+                logger.LogInformation("Token expired, attempting refresh for account {AccountId}", account.Id);
                 var refreshedToken = await metaApiClient.RefreshLongLivedTokenAsync(accessToken, cancellationToken);
                 account.AccessTokenEncrypted = dataProtectionService.Protect(refreshedToken);
                 account.TokenExpiresUtc = DateTime.UtcNow.AddDays(60);
                 account.LastTokenRefreshUtc = DateTime.UtcNow;
                 account.TokenStatus = "active";
+                account.RefreshRequired = false;
                 accessToken = refreshedToken;
                 await db.SaveChangesAsync(cancellationToken);
-                logger.LogInformation("Token refreshed successfully");
+                logger.LogInformation("Token refreshed successfully for account {AccountId}", account.Id);
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Token refresh failed for account {AccountId}", account.Id);
-                // Continue with existing token
+                logger.LogError(ex, "Token refresh failed for account {AccountId}, marking for re-auth", account.Id);
+                account.TokenStatus = "invalid";
+                account.RefreshRequired = true;
+                await db.SaveChangesAsync(cancellationToken);
+                throw new InvalidOperationException("Failed to refresh Instagram token. Please re-authenticate.", ex);
+            }
+        }
+        else if (account.TokenExpiresUtc.HasValue && account.TokenExpiresUtc.Value < DateTime.UtcNow.AddDays(7))
+        {
+            // Token expiring within 7 days — mark for background refresh but don't call Meta now
+            if (!account.RefreshRequired)
+            {
+                logger.LogInformation("Token expiring soon (within 7 days), marking for background refresh, account {AccountId}", account.Id);
+                account.RefreshRequired = true;
+                await db.SaveChangesAsync(cancellationToken);
             }
         }
 
