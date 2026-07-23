@@ -24,6 +24,15 @@ internal static class AutomationMapping
             ))
             .ToListAsync(cancellationToken);
 
+        // Get automation statistics from webhook events
+        var runsCount = await db.WebhookEvents
+            .Where(x => x.AutomationId == automation.Id)
+            .CountAsync(cancellationToken);
+
+        var successCount = await db.WebhookEvents
+            .Where(x => x.AutomationId == automation.Id && x.Status == WebhookStatus.Completed)
+            .CountAsync(cancellationToken);
+
         return new AutomationDto(
             automation.Id,
             automation.InstagramAccountId,
@@ -38,7 +47,9 @@ internal static class AutomationMapping
             automation.Enabled,
             automation.CooldownSeconds,
             automation.Priority,
-            selectedMedia);
+            selectedMedia,
+            runsCount,
+            successCount);
     }
 
     public static void Apply(Automation automation, string name, AutomationScope scope, AutomationTriggerType triggerType, string[] keywords, string? publicReply, string? privateReply, bool sendPublicReply, bool sendPrivateReply, int cooldownSeconds, int priority)

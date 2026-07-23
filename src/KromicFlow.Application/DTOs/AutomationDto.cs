@@ -16,7 +16,9 @@ public sealed record AutomationDto(
     bool Enabled,
     int CooldownSeconds,
     int Priority,
-    List<MediaForAutomationDto> SelectedMedia
+    List<MediaForAutomationDto> SelectedMedia,
+    int RunsCount,
+    int SuccessCount
 );
 
 public sealed record MediaForAutomationDto(
