@@ -38,7 +38,20 @@ public static class ServiceCollectionExtensions
         services.AddCors(options => options.AddPolicy("Frontend", policy =>
         {
             var origins = GetAllowedOrigins(configuration);
-            policy.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
+            policy
+                .WithOrigins(origins)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials()
+                .SetPreflightMaxAge(TimeSpan.FromHours(1));
+
+            // Mobile schemes don't support CORS in the traditional sense,
+            // but we allow them via header inspection in middleware
+            var allowMobileSchemes = configuration.GetValue("Cors:AllowMobileSchemes", false);
+            if (allowMobileSchemes)
+            {
+                policy.SetIsOriginAllowedToAllowWildcardSubdomains();
+            }
         }));
 
         var jwt = configuration.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();

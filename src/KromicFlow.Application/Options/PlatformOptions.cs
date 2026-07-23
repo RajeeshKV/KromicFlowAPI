@@ -18,4 +18,16 @@ public sealed class PlatformOptions
     /// Example: https://yourdomain.com/verify-email
     /// </summary>
     public string EmailVerificationRedirectUrl { get; set; } = "https://flow.kromic.in/verify-email";
+
+    /// <summary>
+    /// Mobile deep linking scheme (e.g., "kromicflow")
+    /// Used for OAuth callback deep links: kromicflow://auth/callback?code=...&state=...
+    /// </summary>
+    public string MobileDeepLinkScheme { get; set; } = "kromicflow";
+
+    /// <summary>
+    /// Mobile OAuth callback path (e.g., "auth/callback")
+    /// Combined with scheme to form: {scheme}://{path}
+    /// </summary>
+    public string MobileOAuthCallbackPath { get; set; } = "auth/callback";
 }

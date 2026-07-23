@@ -17,6 +17,13 @@ public sealed class MetaOptions
     [Required]
     [Url]
     public string FrontendRedirectUri { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Mobile deep link URI for React Native/Expo clients.
+    /// Example: kromicflow://auth/callback
+    /// This must be registered in Meta's OAuth allowed redirect URIs.
+    /// </summary>
+    public string MobileRedirectUri { get; set; } = "kromicflow://auth/callback";
     
     [Required]
     public string WebhookVerifyToken { get; set; } = string.Empty;
@@ -32,3 +39,4 @@ public sealed class MetaOptions
     [Url]
     public string ApiBaseUrl { get; set; } = "https://api.instagram.com";
 }
+

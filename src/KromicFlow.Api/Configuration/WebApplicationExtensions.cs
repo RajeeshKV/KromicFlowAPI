@@ -14,6 +14,7 @@ public static class WebApplicationExtensions
 
     public static WebApplication UseApiPipeline(this WebApplication app)
     {
+        app.UseMiddleware<KromicFlow.Api.Middleware.MobileClientMiddleware>();
         app.UseMiddleware<KromicFlow.Api.Middleware.ExceptionHandlingMiddleware>();
         app.UseSwagger();
         app.UseSwaggerUI();
